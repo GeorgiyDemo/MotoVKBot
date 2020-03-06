@@ -1,86 +1,70 @@
-from random import randint
+# -*- coding: utf-8 -*-
+
+import requests
 
 import vk_api
-from vk_api.keyboard import VkKeyboard, VkKeyboardColor
+from vk_api import VkUpload
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
 
-import formater1
-import formater2
-import parser1
-import parser2
+
+def main():
+    session = requests.Session()
 
 
-def write_msg(user_id, message):
-    vk.method('messages.send', {'user_id': user_id, 'random_id': get_random_id(), 'message': message})
+    # Авторизация группы (для групп рекомендуется использовать VkBotLongPoll):
+    # при передаче token вызывать vk_session.auth не нужно
+
+    vk_session = vk_api.VkApi(token="1700f1c88bf1c5ef4b7a52a47c28887a9dafc8502be755b0fcf2aadf6f4854cb0de40df94c364a0528001")
 
 
-# API-ключ созданный ранее
-token = "Токен снова слился"
+    vk = vk_session.get_api()
 
-# Авторизуемся как сообщество
-vk = vk_api.VkApi(token=token)
+    upload = VkUpload(vk_session)  # Для загрузки изображений
+    longpoll = VkLongPoll(vk_session)
 
-universal_dict = {}
-# Работа с сообщениями
-longpoll = VkLongPoll(vk)
+    for event in longpoll.listen():
+        if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text:
+            print('id{}: "{}"'.format(event.user_id, event.text), end=' ')
 
-# Основной цикл
-for event in longpoll.listen():
+            response = session.get(
+                'http://api.duckduckgo.com/',
+                params={
+                    'q': event.text,
+                    'format': 'json'
+                }
+            ).json()
 
-    # Если пришло новое сообщение
-    if event.type == VkEventType.MESSAGE_NEW:
+            text = response.get('AbstractText')
+            image_url = response.get('Image')
 
-        # Если оно имеет метку для меня( то есть бота)
-        if event.to_me:
+            if not text:
+                vk.messages.send(
+                    user_id=event.user_id,
+                    random_id=get_random_id(),
+                    message='No results'
+                )
+                print('no results')
+                continue
 
-            # Сообщение от пользователя
-            request = event.text
+            attachments = []
 
-            if request == "/start":
+            if image_url:
+                image = session.get(image_url, stream=True)
+                photo = upload.photo_messages(photos=image.raw)[0]
 
-                universal_dict[event.user_id] = {}
-                keyboard = VkKeyboard(one_time=True)
-                keyboard.add_button('bolshoi ru', color=VkKeyboardColor.DEFAULT)
-                keyboard.add_button('et-cetera ru', color=VkKeyboardColor.DEFAULT)
-                message_str = "Здравствуйте, я подскажу Вам график спектаклей\nДля начала выберите источник, который хотите использовать:"
-                vk.method('messages.send',
-                          {'user_id': event.user_id, 'random_id': get_random_id(), "keyboard": keyboard.get_keyboard(),
-                           'message': message_str})
+                attachments.append(
+                    'photo{}_{}'.format(photo['owner_id'], photo['id'])
+                )
 
-            elif request == "bolshoi ru" and event.user_id in universal_dict:
-                universal_dict[event.user_id]["source"] = 1
-                write_msg(event.user_id,
-                          "Введите месяц и год в формате 01/2020 для отображения расписания на конкретный месяц или день месяц и год в формате 01/01/2020 для отображения расписания на конкретный день")
+            vk.messages.send(
+                user_id=event.user_id,
+                attachment=','.join(attachments),
+                random_id=get_random_id(),
+                message=text
+            )
+            print('ok')
 
-            elif request == "et-cetera ru" and event.user_id in universal_dict:
-                universal_dict[event.user_id]["source"] = 2
-                write_msg(event.user_id,
-                          "Введите месяц и год в формате 01/2020 для отображения расписания на конкретный месяц или день месяц и год в формате 01/01/2020 для отображения расписания на конкретный день")
-            else:
-                if event.user_id in universal_dict:
 
-                    # Если введенная дата является корректной
-                    if (len(request) == 7 and "/" in request) or (len(request) == 10 and "/" in request):
-
-                        write_msg(event.user_id, "Получаем данные..")
-                        # Если был выбран источник №1
-                        if universal_dict[event.user_id]["source"] == 1:
-                            result = parser1.parser(request)
-                            send_list = formater1.format(result)
-                            for s in send_list:
-                                write_msg(event.user_id, s)
-
-                        # Иначе если был выбран источник №2
-                        elif universal_dict[event.user_id]["source"] == 2:
-                            result = parser2.parser(request)
-                            send_list = formater2.format(result)
-                            for s in send_list:
-                                write_msg(event.user_id, s)
-                    else:
-                        write_msg(event.user_id, "Некорректный ввод даты!")
-
-                    universal_dict.pop(event.user_id, None)
-
-                else:
-                    write_msg(event.user_id, "Напишите мне /start для начала работы 😉")
+if __name__ == '__main__':
+    main()
