@@ -1,22 +1,38 @@
-#TODO предложение о добавлении поста в предложку сообщества
+#https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
 
 import vk_api
 import yaml
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
-
+import time
 import requests
+import multiprocessing as mp
 
-#TODO вынести потом в 
+#TODO вынести потом в БД
 message_dict = {
-    1 : "\nМеня зовут Яшка. Я чат-бот, и у меня есть ключи от Мотосарая. здесь продаются з/ч для кастом байков.\n\nДавай познакомимся?\nОтвечая на мои вопросы, ты будешь получать разные бонусы.\n\nЧтобы получить чек-лист \"Трушного боббера\" нажми на кнопку.\nЧтобы ознакомиться с нашими товарами нажми на \"Магазин\".\n\n__________\nЕсли вдруг у тебя не появляются кнопки, сделай как показано на изображении."
-    2 : "В нашем магазине есть подборки по категориям товаров, в каждой из них ты найдешь что-то для своего проекта.\n\n"
+    1 : "\nМеня зовут Яшка. Я чат-бот, и у меня есть ключи от Мотосарая. здесь продаются з/ч для кастом байков.\n\nДавай познакомимся?\nОтвечая на мои вопросы, ты будешь получать разные бонусы.\n\nЧтобы получить чек-лист \"Трушного боббера\" нажми на кнопку.\nЧтобы ознакомиться с нашими товарами нажми на \"Магазин\".\n\n__________\nЕсли вдруг у тебя не появляются кнопки, сделай как показано на изображении.",
+    2 : "В нашем магазине есть подборки по категориям товаров, в каждой из них ты найдешь что-то для своего проекта.\n\n",
 }
 def get_settings():
     """Чтение настроек с yaml"""
     with open("./yaml/settings.yml", 'r') as stream:
         return yaml.safe_load(stream)
+
+class WallMonitoringClass:
+    def __init__(self, token):
+        
+        self.vk = vk_api.VkApi(token=token)
+        while True:
+            self.monitoring()
+            time.sleep(10)
+    
+    #Мониторим последние 3 записи т.к может быть такое, что проставили хештеги проще
+    def monitoring(self):
+        results = self.vk.method("wall.get", {"owner_id": -170171504, "count":3})
+        for result in results["items"]:
+            #TODO получаем
+            print(result["text"])
 
 class PhotoUploaderClass:
     """Класс для загрузки фото в VK"""
@@ -41,13 +57,11 @@ class PhotoUploaderClass:
         self.__photo_str = photo_str
     
 
-    
 class MainClass:
-    def __init__(self):
+    def __init__(self, token):
 
-        self.settings = get_settings()
         # Авторизуемся как сообщество
-        self.vk = vk_api.VkApi(token=self.settings["token"])
+        self.vk = vk_api.VkApi(token=token)
         self.processing()
 
     def processing(self):
@@ -94,4 +108,6 @@ class MainClass:
         return name
 
 if __name__ == "__main__":
-    MainClass()
+    settings = get_settings()
+    mp.Process(target=WallMonitoringClass,args=(settings["user_token"],)).start()
+    MainClass(settings["group_token"])
