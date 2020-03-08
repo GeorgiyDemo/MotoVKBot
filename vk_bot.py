@@ -1,70 +1,88 @@
-# -*- coding: utf-8 -*-
-
-import requests
+#TODO предложение о добавлении поста в предложку сообщества
 
 import vk_api
-from vk_api import VkUpload
+import yaml
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
 
-
-def main():
-    session = requests.Session()
+import requests
 
 
-    # Авторизация группы (для групп рекомендуется использовать VkBotLongPoll):
-    # при передаче token вызывать vk_session.auth не нужно
+message_dict = {
+    1 : "\nМеня зовут Яшка. Я чат-бот, и у меня есть ключи от Мотосарая. здесь продаются з/ч для кастом байков.\n\nДавай познакомимся?\nОтвечая на мои вопросы, ты будешь получать разные бонусы.\n\nЧтобы получить чек-лист \"Трушного боббера\" нажми на кнопку.\nЧтобы ознакомиться с нашими товарами нажми на \"Магазин\".\n\n__________\nЕсли вдруг у тебя не появляются кнопки, сделай как показано на изображении."
+}
+def get_settings():
+    """Чтение настроек с yaml"""
+    with open("./yaml/settings.yml", 'r') as stream:
+        return yaml.safe_load(stream)
 
-    vk_session = vk_api.VkApi(token="1700f1c88bf1c5ef4b7a52a47c28887a9dafc8502be755b0fcf2aadf6f4854cb0de40df94c364a0528001")
+def get_username(vk, user_id):
+    """Метод, возвращающий имя пользователя по id"""
 
+    name = vk.method('users.get', {'user_id': user_id})[0]["first_name"]
+    return name
 
-    vk = vk_session.get_api()
+class MainClass():
+    def __init__(self):
 
-    upload = VkUpload(vk_session)  # Для загрузки изображений
-    longpoll = VkLongPoll(vk_session)
+        self.settings = get_settings()
+        # Авторизуемся как сообщество
+        self.vk = vk_api.VkApi(token=self.settings["token"])
 
-    for event in longpoll.listen():
-        if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text:
-            print('id{}: "{}"'.format(event.user_id, event.text), end=' ')
+        self.processing()
 
-            response = session.get(
-                'http://api.duckduckgo.com/',
-                params={
-                    'q': event.text,
-                    'format': 'json'
-                }
-            ).json()
+    def get_url(self, message_id):
+        """
+        Метод для получения url изобржения из id сообщения
+        """
+        
+        # Получаем сообщеньку по методу
+        r = self.vk.method('messages.getById', {'message_ids': message_id, "group_id" : self.settings["group_id"]})["items"]
+        
+        # Находим все размеры фото
+        all_sizes = r[0]["attachments"][0]["photo"]["sizes"]
 
-            text = response.get('AbstractText')
-            image_url = response.get('Image')
+        # В цикле по каждой ищем самое большое изображение
+        height, width, index = 0, 0, 0
+        for i in range(len(all_sizes)):
+            if all_sizes[i]["width"] > width and all_sizes[i]["height"] > height:
+                height = all_sizes[i]["height"]
+                width = all_sizes[i]["width"]
+                index = i
 
-            if not text:
-                vk.messages.send(
-                    user_id=event.user_id,
-                    random_id=get_random_id(),
-                    message='No results'
-                )
-                print('no results')
-                continue
+        # Обращаемся к полученному индексу
+        url = all_sizes[index]["url"]
 
-            attachments = []
+        # Берем последний элемент списка (т.к. он самый большой)
+        return url
 
-            if image_url:
-                image = session.get(image_url, stream=True)
-                photo = upload.photo_messages(photos=image.raw)[0]
+    def processing(self):
+        """
+        Метод обработки входящих сообщений
+        """
+        # Работа с сообщениями
+        longpoll = VkLongPoll(self.vk)
 
-                attachments.append(
-                    'photo{}_{}'.format(photo['owner_id'], photo['id'])
-                )
+        # Основной цикл
+        for event in longpoll.listen():
 
-            vk.messages.send(
-                user_id=event.user_id,
-                attachment=','.join(attachments),
-                random_id=get_random_id(),
-                message=text
-            )
-            print('ok')
+            # Если пришло новое сообщение
+            if event.type == VkEventType.MESSAGE_NEW:
 
+                # Если оно имеет метку для бота
+                if event.to_me:
 
-if __name__ == '__main__':
-    main()
+                    # Шаг 1
+                    if event.text == "Начать":
+                        
+                        message_str = "Привет, "+get_username(self.vk, event.user_id)+message_dict[1]
+                        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str })
+
+                    #Шаг 3
+                    elif event.text == "Чек-лист \"Трушного боббера\"":
+                        print(event)
+                        message_str = "Привет, просто отправь мне любое фото 🧩"
+                        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str })
+
+if __name__ == "__main__":
+    MainClass()
