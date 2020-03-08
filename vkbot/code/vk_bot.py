@@ -1,4 +1,6 @@
 #https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
+#TODO Ботов сюда
+#TODO БД СЮДА
 
 import vk_api
 import yaml
@@ -108,6 +110,7 @@ class MainClass:
         return name
 
 if __name__ == "__main__":
+
     settings = get_settings()
     mp.Process(target=WallMonitoringClass,args=(settings["user_token"],)).start()
     MainClass(settings["group_token"])
