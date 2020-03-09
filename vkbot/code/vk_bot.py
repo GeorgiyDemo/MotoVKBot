@@ -1,5 +1,5 @@
-#https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
-#TODO Ботов сюда
+# https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
+# TODO Ботов сюда
 
 import pymongo
 import vk_api
@@ -11,10 +11,12 @@ import time
 import requests
 import multiprocessing as mp
 
-class UserClass():
+
+class MongoUserClass:
+    """Класс для работы с пользователями"""
     def __init__(self, connection):
         self.table = connection["users"]
-    
+
     def search_user(self, user_id):
         if self.table.find_one({"user_id": user_id}) == None:
             return False
@@ -22,46 +24,51 @@ class UserClass():
 
     def new_data(self, user_id, first_name, second_name, current_step, moto_model="-", moto_type="-", money_count="-"):
         """Занесение начальных значений пользователя в БД"""
-        self.table.insert_one({"user_id": user_id, "first_name": first_name, "second_name": second_name, "current_step": current_step, "moto_model": moto_model, "moto_type": moto_type, "money_count": money_count})
-    
-    def update_data(self, user_id, current_step, moto_model="-", moto_type="-", money_count="-"):
-        self.table.update_one({"user_id": user_id}, {"$set": {"current_step": new_status, "package_box": package_box}})
+        self.table.insert_one({"user_id": user_id, "first_name": first_name, "second_name": second_name,
+                              "current_step": current_step, "moto_model": moto_model, "moto_type": moto_type, "money_count": money_count})
 
-class MsgClass:
+    #TODO Делать так, чтоб обновлялись значения только где "-"
+    def update_data(self, user_id, current_step, moto_model="-", moto_type="-", money_count="-"):
+        pass
+        #self.table.update_one({"user_id": user_id}, {"$set": {"current_step": new_status, "package_box": package_box}})
+
+
+class MongoMsgClass:
+    """Класс для получения текста ответных сообщений в зависимости от шага"""
     def __init__(self, connection):
         self.connection = connection
-        self.table = mongo["packages"]
+        self.table = mongo["out_messages"]
+    
+    def get_message(self, step):
+        result = self.table.find_one({"current_step": step}, {"message": 1, "_id": 0})
+        return result["message"]
 
-
-
-#TODO вынести потом в БД
-message_dict = {
-    1 : "\nМеня зовут Яшка. Я чат-бот, и у меня есть ключи от Мотосарая. здесь продаются з/ч для кастом байков.\n\nДавай познакомимся?\nОтвечая на мои вопросы, ты будешь получать разные бонусы.\n\nЧтобы получить чек-лист \"Трушного боббера\" нажми на кнопку.\nЧтобы ознакомиться с нашими товарами нажми на \"Магазин\".\n\n__________\nЕсли вдруг у тебя не появляются кнопки, сделай как показано на изображении.",
-    2 : "В нашем магазине есть подборки по категориям товаров, в каждой из них ты найдешь что-то для своего проекта.\n\n",
-}
 def get_settings():
     """Чтение настроек с yaml"""
     with open("./yaml/settings.yml", 'r') as stream:
         return yaml.safe_load(stream)
 
+
 class WallMonitoringClass:
-    def __init__(self, token, connection, group):
+    def __init__(self, token, group):
         self.vk = vk_api.VkApi(token=token)
-        self.connection = connection
         self.group = group
         while True:
             self.monitoring()
             time.sleep(10)
-    
-    #Мониторим последние 3 записи т.к может быть такое, что проставили хештеги проще
+
+    # Мониторим последние 3 записи т.к может быть такое, что проставили хештеги проще
     def monitoring(self):
-        results = self.vk.method("wall.get", {"owner_id": self.group, "count":3})
+        results = self.vk.method(
+            "wall.get", {"owner_id": self.group, "count": 3})
         for result in results["items"]:
-            #TODO получаем
+            # TODO получаем
             print(result["text"])
+
 
 class PhotoUploaderClass:
     """Класс для загрузки фото в VK"""
+
     def __init__(self, vk, user_id, path):
         self.vk = vk
         self.user_id = user_id
@@ -76,20 +83,35 @@ class PhotoUploaderClass:
     def photo_uploader(self):
         """Загрузка фото с локали в VK"""
 
-        server_url = self.vk.method('photos.getMessagesUploadServer', {'peer_id': self.user_id})["upload_url"]
-        photo_r = requests.post(server_url, files={'photo': open(self.path, 'rb')}).json()
-        photo_final = self.vk.method("photos.saveMessagesPhoto",{"photo": photo_r["photo"], "server": photo_r["server"], "hash": photo_r["hash"]})[0]
-        photo_str = "photo" + str(photo_final["owner_id"]) + "_" + str(photo_final["id"])
+        server_url = self.vk.method('photos.getMessagesUploadServer', {
+                                    'peer_id': self.user_id})["upload_url"]
+        photo_r = requests.post(
+            server_url, files={'photo': open(self.path, 'rb')}).json()
+        photo_final = self.vk.method("photos.saveMessagesPhoto", {
+                                     "photo": photo_r["photo"], "server": photo_r["server"], "hash": photo_r["hash"]})[0]
+        photo_str = "photo" + \
+            str(photo_final["owner_id"]) + "_" + str(photo_final["id"])
         self.__photo_str = photo_str
-    
+
 
 class MainClass:
     def __init__(self, token, connection):
-
+        
+        #Коннект к БД
         self.connection = connection
         # Авторизуемся как сообщество
         self.vk = vk_api.VkApi(token=token)
-        self.mongo_user_obj = UserClass(connection)
+        #Взаимодействие с БД пользователей
+        self.mongo_user_obj = MongoUserClass(connection)
+        #Взаимодействие с исходящими сообщеньками в БД
+        self.mongo_msg_obj = MongoMsgClass(connection)
+
+        #Сообщение и какой метод за него отвечает
+        self.main_dict = {
+            "Начать" : self.step_1,
+            "Магазин" : self.step_2,
+            "Чек-лист &quot;Трушного боббера&quot;" : self.step_3,
+        }
         self.processing()
 
     def processing(self):
@@ -105,45 +127,49 @@ class MainClass:
 
                 # Если оно имеет метку для бота
                 if event.to_me:
-                    
-                    print(event.text)
-                    # Шаг 1
-                    if event.text == "Начать":
-                        
-                        first_name, second_name = self.get_username(event.user_id)
-                        if not self.mongo_user_obj.search_user(event.user_id):
-                            self.mongo_user_obj.new_data(event.user_id,first_name,second_name,1)
-                        
-                        #Кнопки для VK
-                        keyboard = VkKeyboard(one_time=True)
-                        keyboard.add_button('Чек-лист "Трушного боббера"', color=VkKeyboardColor.DEFAULT)
-                        keyboard.add_button('Магазин', color=VkKeyboardColor.DEFAULT)
-                        #Загружаем фото
-                        photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/buttons.jpg")
-                        message_str = "Привет, "+first_name+message_dict[1]
-                        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), "keyboard": keyboard.get_keyboard(), 'message': message_str, 'attachment': photo_obj.photo_str})
 
-                    #Шаг 2
-                    elif event.text == 'Магазин':
-                        message_str = ""
-                        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
-                    
-                    #Шаг 3
-                    elif event.text == 'Чек-лист &quot;Трушного боббера&quot;':
-                        message_str = "*БАТОН 2*"
-                        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
+                    if event.text in self.main_dict:
+                        self.main_dict[event.text](event)
+                    else:
+                        print("Неизвестная команда: '{}'".format(event.text))
 
+    def step_1(self, event):
+        """Обработка шага 1"""
+        first_name, second_name = self.get_username(event.user_id)
+        if not self.mongo_user_obj.search_user(event.user_id):
+            self.mongo_user_obj.new_data(event.user_id, first_name, second_name, 1)
+
+        # Кнопки для VK
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('Чек-лист "Трушного боббера"',color=VkKeyboardColor.DEFAULT)
+        keyboard.add_button('Магазин', color=VkKeyboardColor.DEFAULT)
+        
+        # Загружаем фото
+        photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/buttons.jpg")
+        message_str = "Привет, "+first_name+self.mongo_msg_obj.get_message(1)
+        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), "keyboard": keyboard.get_keyboard(), 'message': message_str, 'attachment': photo_obj.photo_str})
+
+    def step_2(self, event):
+        """Обработка шага 1"""
+        message_str = self.mongo_msg_obj.get_message(2)
+        self.vk.method('messages.send', {
+        'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
+
+    def step_3(self, event):
+        message_str = "*БАТОН 2*"
+        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
+    
     def get_username(self, user_id):
         """Метод, возвращающий имя пользователя по id"""
 
         name = self.vk.method('users.get', {'user_id': user_id})[0]
         return name["first_name"], name["last_name"]
 
+
 if __name__ == "__main__":
 
-    
     settings = get_settings()
+    mp.Process(target=WallMonitoringClass, args=(settings["user_token"],settings["group_id"], )).start()
     myclient = pymongo.MongoClient(settings["mongodb_connection"])
     mongo = myclient['MotoVKBot']
-    mp.Process(target=WallMonitoringClass,args=(settings["user_token"], mongo, settings["group_id"], )).start()
-    MainClass(settings["group_token"],mongo)
+    MainClass(settings["group_token"], mongo)

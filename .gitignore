@@ -1,6 +1,6 @@
-
 *.pyc
 .DS_Store
 yaml/settings.yml
 telegram/code/yaml/settings.yml
 vkbot/code/yaml/settings.yml
+database
