@@ -26,4 +26,4 @@ ADD requirements.txt /app/
 WORKDIR /app
 
 RUN pip3 install -r requirements.txt
-CMD ["python3", "./code/bot.py"]
+CMD ["python3", "./code/vk_bot.py"]

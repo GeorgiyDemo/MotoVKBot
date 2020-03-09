@@ -1,7 +1,7 @@
 #https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
 #TODO Ботов сюда
-#TODO БД СЮДА
 
+import pymongo
 import vk_api
 import yaml
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
@@ -10,6 +10,29 @@ from vk_api.utils import get_random_id
 import time
 import requests
 import multiprocessing as mp
+
+class UserClass():
+    def __init__(self, connection):
+        self.table = connection["users"]
+    
+    def search_user(self, user_id):
+        if self.table.find_one({"user_id": user_id}) == None:
+            return False
+        return True
+
+    def new_data(self, user_id, first_name, second_name, current_step, moto_model="-", moto_type="-", money_count="-"):
+        """Занесение начальных значений пользователя в БД"""
+        self.table.insert_one({"user_id": user_id, "first_name": first_name, "second_name": second_name, "current_step": current_step, "moto_model": moto_model, "moto_type": moto_type, "money_count": money_count})
+    
+    def update_data(self, user_id, current_step, moto_model="-", moto_type="-", money_count="-"):
+        self.table.update_one({"user_id": user_id}, {"$set": {"current_step": new_status, "package_box": package_box}})
+
+class MsgClass:
+    def __init__(self, connection):
+        self.connection = connection
+        self.table = mongo["packages"]
+
+
 
 #TODO вынести потом в БД
 message_dict = {
@@ -22,16 +45,17 @@ def get_settings():
         return yaml.safe_load(stream)
 
 class WallMonitoringClass:
-    def __init__(self, token):
-        
+    def __init__(self, token, connection, group):
         self.vk = vk_api.VkApi(token=token)
+        self.connection = connection
+        self.group = group
         while True:
             self.monitoring()
             time.sleep(10)
     
     #Мониторим последние 3 записи т.к может быть такое, что проставили хештеги проще
     def monitoring(self):
-        results = self.vk.method("wall.get", {"owner_id": -170171504, "count":3})
+        results = self.vk.method("wall.get", {"owner_id": self.group, "count":3})
         for result in results["items"]:
             #TODO получаем
             print(result["text"])
@@ -60,10 +84,12 @@ class PhotoUploaderClass:
     
 
 class MainClass:
-    def __init__(self, token):
+    def __init__(self, token, connection):
 
+        self.connection = connection
         # Авторизуемся как сообщество
         self.vk = vk_api.VkApi(token=token)
+        self.mongo_user_obj = UserClass(connection)
         self.processing()
 
     def processing(self):
@@ -84,13 +110,17 @@ class MainClass:
                     # Шаг 1
                     if event.text == "Начать":
                         
+                        first_name, second_name = self.get_username(event.user_id)
+                        if not self.mongo_user_obj.search_user(event.user_id):
+                            self.mongo_user_obj.new_data(event.user_id,first_name,second_name,1)
+                        
                         #Кнопки для VK
                         keyboard = VkKeyboard(one_time=True)
                         keyboard.add_button('Чек-лист "Трушного боббера"', color=VkKeyboardColor.DEFAULT)
                         keyboard.add_button('Магазин', color=VkKeyboardColor.DEFAULT)
                         #Загружаем фото
                         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/buttons.jpg")
-                        message_str = "Привет, "+self.get_username(event.user_id)+message_dict[1]
+                        message_str = "Привет, "+first_name+message_dict[1]
                         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), "keyboard": keyboard.get_keyboard(), 'message': message_str, 'attachment': photo_obj.photo_str})
 
                     #Шаг 2
@@ -106,11 +136,14 @@ class MainClass:
     def get_username(self, user_id):
         """Метод, возвращающий имя пользователя по id"""
 
-        name = self.vk.method('users.get', {'user_id': user_id})[0]["first_name"]
-        return name
+        name = self.vk.method('users.get', {'user_id': user_id})[0]
+        return name["first_name"], name["last_name"]
 
 if __name__ == "__main__":
 
+    
     settings = get_settings()
-    mp.Process(target=WallMonitoringClass,args=(settings["user_token"],)).start()
-    MainClass(settings["group_token"])
+    myclient = pymongo.MongoClient(settings["mongodb_connection"])
+    mongo = myclient['MotoVKBot']
+    mp.Process(target=WallMonitoringClass,args=(settings["user_token"], mongo, settings["group_id"], )).start()
+    MainClass(settings["group_token"],mongo)

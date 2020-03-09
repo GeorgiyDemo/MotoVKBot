@@ -24,22 +24,11 @@ services:
     depends_on: 
       - mongo
   
-  flask:
-    build: server/.
+  vkbot:
+    build: vkbot/.
     depends_on:
       - mongo
-    ports:
-     - "5000:5000"
     restart: on-failure
     volumes:
       - ./yaml/:/app/yaml/
-      - ./server/code/:/app/code/
-  
-  telegram:
-    build: telegram/.
-    depends_on:
-      - flask
-    restart: on-failure
-    volumes:
-      - ./yaml/:/app/yaml/
-      - ./telegram/code/:/app/code/
+      - ./vkbot/code/:/app/code/
