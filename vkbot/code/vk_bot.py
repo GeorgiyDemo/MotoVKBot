@@ -1,5 +1,4 @@
 # https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
-# TODO Ботов сюда
 
 import pymongo
 import vk_api
@@ -111,6 +110,9 @@ class MainClass:
             "Начать" : self.step_1,
             "Магазин" : self.step_2,
             "Чек-лист &quot;Трушного боббера&quot;" : self.step_3,
+            "Кастом" : self.step_6,
+            "Сток" : self.ste_7,
+
         }
         self.processing()
 
@@ -150,15 +152,27 @@ class MainClass:
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), "keyboard": keyboard.get_keyboard(), 'message': message_str, 'attachment': photo_obj.photo_str})
 
     def step_2(self, event):
-        """Обработка шага 1"""
+        """Обработка шага 2"""
         message_str = self.mongo_msg_obj.get_message(2)
-        self.vk.method('messages.send', {
-        'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
+        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
+        #Т.к. у нас безусловный переход от 2 к 4 шагу
+        self.step_4(event)
 
     def step_3(self, event):
-        message_str = "*БАТОН 2*"
+        """Обработка шага 3"""
+        message_str = self.mongo_msg_obj.get_message(3)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
+        #Т.к. у нас безусловный переход от 2 к 4 шагу
+        self.step_4(event)
     
+    def step_4(self, event):
+        """
+        Обработка шага 4
+        - Вызывается только от step_2/step_3
+        """
+        message_str = self.mongo_msg_obj.get_message(4)
+        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
+        
     def get_username(self, user_id):
         """Метод, возвращающий имя пользователя по id"""
 
