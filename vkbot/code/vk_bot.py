@@ -10,7 +10,7 @@ import time
 import requests
 import multiprocessing as mp
 
-
+#TODO Провреки на выполнение команд ввести
 class MongoUserClass:
     """Класс для работы с пользователями"""
     def __init__(self, connection):
@@ -21,15 +21,25 @@ class MongoUserClass:
             return False
         return True
 
+    #TODO
+    def get_current_step(self, user_id):
+        """Получение текущего шага пользователя"""
+        r = self.table.find_one({"user_id": user_id})
+        if r == None:
+            return 0
+
     def new_data(self, user_id, first_name, second_name, current_step, moto_model="-", moto_type="-", money_count="-"):
         """Занесение начальных значений пользователя в БД"""
         self.table.insert_one({"user_id": user_id, "first_name": first_name, "second_name": second_name,
                               "current_step": current_step, "moto_model": moto_model, "moto_type": moto_type, "money_count": money_count})
 
-    #TODO Делать так, чтоб обновлялись значения только где "-"
-    def update_data(self, user_id, current_step, moto_model="-", moto_type="-", money_count="-"):
-        pass
-        #self.table.update_one({"user_id": user_id}, {"$set": {"current_step": new_status, "package_box": package_box}})
+    #TODO Потестить изменение БЮ и метод MongoUserClass.update_data
+    def update_data(self, user_id, *items):
+        set_dict = {}
+        for e in items: 
+            set_dict.update(e)
+
+        self.table.update_one({"user_id": user_id}, {"$set": set_dict})
 
 
 class MongoMsgClass:
@@ -129,14 +139,23 @@ class MainClass:
 
                 # Если оно имеет метку для бота
                 if event.to_me:
-
+                    
+                    #Если текст есть в словаре self.main_dict, отвечающем за ассоциацию
                     if event.text in self.main_dict:
                         self.main_dict[event.text](event)
+                    
+                    #Если нет, то это может быть модель мото с шага 4
+                    elif self.mongo_user_obj.get_current_step(event.user_id) == 4:
+                        #Вызываем шаг 5
+                        self.step_5()
+
+
                     else:
                         print("Неизвестная команда: '{}'".format(event.text))
 
     def step_1(self, event):
         """Обработка шага 1"""
+        #Получаем имя пользователя
         first_name, second_name = self.get_username(event.user_id)
         if not self.mongo_user_obj.search_user(event.user_id):
             self.mongo_user_obj.new_data(event.user_id, first_name, second_name, 1)
@@ -153,6 +172,7 @@ class MainClass:
 
     def step_2(self, event):
         """Обработка шага 2"""
+        self.mongo_user_obj.update_data(event.user_id, {"current_step": 2})
         message_str = self.mongo_msg_obj.get_message(2)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
         #Т.к. у нас безусловный переход от 2 к 4 шагу
@@ -160,6 +180,7 @@ class MainClass:
 
     def step_3(self, event):
         """Обработка шага 3"""
+        self.mongo_user_obj.update_data(event.user_id, {"current_step": 3})
         message_str = self.mongo_msg_obj.get_message(3)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
         #Т.к. у нас безусловный переход от 2 к 4 шагу
@@ -170,9 +191,19 @@ class MainClass:
         Обработка шага 4
         - Вызывается только от step_2/step_3
         """
+        self.mongo_user_obj.update_data(event.user_id, {"current_step": 4})
         message_str = self.mongo_msg_obj.get_message(4)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
-        
+    
+    def step_5(self, event):
+        """
+        Вызывается после того, как пользователь введет какой-либо текст после шага 4
+        """
+        pass
+
+    def step_6(self, event):
+        pass
+
     def get_username(self, user_id):
         """Метод, возвращающий имя пользователя по id"""
 
