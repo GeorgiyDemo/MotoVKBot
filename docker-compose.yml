@@ -24,11 +24,11 @@ services:
     depends_on: 
       - mongo
   
-  vkbot:
-    build: vkbot/.
-    depends_on:
-      - mongo
-    restart: on-failure
-    volumes:
-      - ./yaml/:/app/yaml/
-      - ./vkbot/code/:/app/code/
+  #vkbot:
+  #  build: vkbot/.
+  #  depends_on:
+  #    - mongo
+  #  restart: on-failure
+  #  volumes:
+  #    - ./yaml/:/app/yaml/
+  #    - ./vkbot/code/:/app/code/
