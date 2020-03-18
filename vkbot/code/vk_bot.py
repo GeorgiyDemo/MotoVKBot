@@ -1,5 +1,6 @@
 # https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
 #TODO Удаление пользователя по команде СТОП
+#TODO Разобраться с 10-15 шагом и как с этим жить
 
 import pymongo
 import vk_api
@@ -14,31 +15,51 @@ import multiprocessing as mp
 class MongoUserClass:
     """Класс для работы с пользователями"""
     def __init__(self, connection):
-        self.table = connection["users"]
+        self.users_table = connection["users"]
+        self.tags_table = connection["tags"]
+
+    def get_usersbytags(self, tag):
+        """Получения id пользователей по определенной выборке тегов"""
+        #Находим тег, берем данные и на основе этих данных отдаем id пользователей
+        tag_fields_dict = self.tags_table.find_one({"name" : tag},{"_id": 0,"name": 0})
+        print("tag_fields_dict {}".format(tag_fields_dict))
+        result = self.users_table.find(tag_fields_dict,{"_id": 0,"user_id": 1})
+        return [e["user_id"] for e in result]
+
+
+    def get_alltags(self):
+        """Получение списка всех тегов"""
+        r = self.tags_table.find(projection={"_id": 0,"name": 1})
+        if r != None:
+            return [e["name"] for e in r]
+        return []
+    
 
     def search_user(self, user_id):
-        if self.table.find_one({"user_id": user_id}) == None:
+        """Поиск пользователя"""
+        if self.users_table.find_one({"user_id": user_id}) == None:
             return False
         return True
 
     def get_current_step(self, user_id):
         """Получение текущего шага пользователя"""
-        r = self.table.find_one({"user_id": user_id},{"_id": 0,"current_step": 1})
+        r = self.users_table.find_one({"user_id": user_id},{"_id": 0,"current_step": 1})
         if r == None:
             return 0
         return r["current_step"]
 
-    def new_data(self, user_id, first_name, second_name, current_step, moto_model="-", moto_type="-", money_count="-"):
+    def new_data(self, user_id, first_name, second_name, current_step):
         """Занесение начальных значений пользователя в БД"""
-        self.table.insert_one({"user_id": user_id, "first_name": first_name, "second_name": second_name,
-                              "current_step": current_step, "moto_model": moto_model, "moto_type": moto_type, "money_count": money_count})
+        self.users_table.insert_one({"user_id": user_id, "first_name": first_name, "second_name": second_name,
+                              "current_step": current_step, "moto_model": "-", "moto_type": "-", "rudder_price": "-", "exhaustpipe_price":"-","wings_price":"-","optics_price":"-","all_price":"-"})
 
     def update_data(self, user_id, *items):
+        """Обновление произвольных данных пользователей в БД"""
         set_dict = {}
         for e in items: 
             set_dict.update(e)
 
-        self.table.update_one({"user_id": user_id}, {"$set": set_dict})
+        self.users_table.update_one({"user_id": user_id}, {"$set": set_dict})
 
 
 class MongoMsgClass:
@@ -48,6 +69,7 @@ class MongoMsgClass:
         self.table = mongo["out_messages"]
     
     def get_message(self, step):
+        print("ПОПЫТКА ПОЛУЧИТЬ СООБЩЕНИЕ ДЛЯ ШАГА {}".format(step))
         result = self.table.find_one({"current_step": step}, {"message": 1, "_id": 0})
         return result["message"]
 
@@ -58,8 +80,11 @@ def get_settings():
 
 
 class WallMonitoringClass:
-    def __init__(self, token, group):
+    def __init__(self, token, group, connection):
         self.vk = vk_api.VkApi(token=token)
+        #Взаимодействие с БД пользователей
+        myclient = pymongo.MongoClient(connection)
+        self.mongo_user_obj = MongoUserClass(myclient['MotoVKBot'])
         self.group = group
         while True:
             self.monitoring()
@@ -67,11 +92,24 @@ class WallMonitoringClass:
 
     # Мониторим последние 3 записи т.к может быть такое, что проставили хештеги проще
     def monitoring(self):
+        #TODO слоаврь пользователей и новости
+        user_alerts_dict = {}
+        tags_list = self.mongo_user_obj.get_alltags()
         results = self.vk.method(
             "wall.get", {"owner_id": self.group, "count": 3})
         for result in results["items"]:
-            # TODO получаем
-            print(result["text"])
+            for tag in tags_list:
+                print(result)
+                if tag in result["text"]:
+                    user_lists = self.mongo_user_obj.get_usersbytags(tag)
+                    wall_id = result["id"]
+                    #Получаем пользователей, связанных с этим тегом из БД
+                    #Оповещаем пользователей об этой штуке
+                    print("")
+
+    def user_alerting(self):
+        #ID поста, ID пользователя
+        pass
 
 
 class PhotoUploaderClass:
@@ -121,11 +159,8 @@ class MainClass:
             "Чек-лист &quot;Трушного боббера&quot;" : self.step_3,
             "Кастом" : self.step_6,
             "Сток" : self.step_7,
-            "0" : self.step_9,
-            '0-5000' : self.step_9,
-            '5001-15000' :  self.step_9,
-            '15001+' :  self.step_9,
         }
+        self.eight_commands_list = ["0",'0-5000','5001-15000','15001+']
 
         self.processing()
 
@@ -146,6 +181,10 @@ class MainClass:
                     #Если текст есть в словаре self.main_dict, отвечающем за ассоциацию
                     if event.text in self.main_dict:
                         self.main_dict[event.text](event)
+                    
+                    #Возможно относится к одному из 8 пунктов
+                    elif 8 <= self.mongo_user_obj.get_current_step(event.user_id) < 9 and event.text in self.eight_commands_list:
+                        self.step_8(event)
                     
                     #Если нет, то это может быть модель мото с шага 4
                     elif self.mongo_user_obj.get_current_step(event.user_id) == 4:
@@ -239,9 +278,38 @@ class MainClass:
         #market-170171504?section=album_4
 
     def step_8(self, event):
-        """Обработка шага 8"""
+        """Обработка шагов 8"""
+        #Ассоциация шага и поля-детали с БД
+        detail_step_dict = {
+            8.1 : "rudder_price",
+            8.2 : "exhaustpipe_price",
+            8.3 : "wings_price",
+            8.4 : "optics_price",
+            8.5 : "all_price",
+        }
 
-        self.mongo_user_obj.update_data(event.user_id,{"current_step":8})
+        #Получаем текущий шаг
+        current_step = self.mongo_user_obj.get_current_step(event.user_id)
+        print("current_step :{}, {}".format(current_step,type(current_step)))
+        
+        #Если первое вхождение в 8 шаг
+        if current_step == 7 or current_step == 6:
+            self.mongo_user_obj.update_data(event.user_id,{"current_step":8})
+            current_step = 8
+        else:
+            #Получаем цену
+            detail_price = event.text
+            #Обновляем данные по этому шагу
+            #Прибавляем шаг
+            current_step += 0.1
+            current_step = round(current_step, 1)
+            self.mongo_user_obj.update_data(event.user_id,{"current_step":current_step}, {detail_step_dict[current_step] : detail_price})
+        #Получаем сообщение, связанное с шагом
+        if current_step == 8.5:
+            self.step_9(event)
+            return
+
+        message_str = self.mongo_msg_obj.get_message(current_step)
 
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
@@ -249,16 +317,13 @@ class MainClass:
         keyboard.add_button('0-5000', color=VkKeyboardColor.DEFAULT)
         keyboard.add_button('5001-15000', color=VkKeyboardColor.DEFAULT)
         keyboard.add_button('15001+', color=VkKeyboardColor.DEFAULT)
-        message_str = self.mongo_msg_obj.get_message(8)
-
+        message_str = self.mongo_msg_obj.get_message(current_step)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, "keyboard": keyboard.get_keyboard()})
-    
+
     def step_9(self, event):
         """Обработка шага 9"""
         
         #Занесение информация о цене:
-        moto_price = event.text
-        self.mongo_user_obj.update_data(event.user_id, {"current_step":9}, {"money_count" : moto_price})
         message_str = self.mongo_msg_obj.get_message(9)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
 
@@ -272,7 +337,7 @@ class MainClass:
 if __name__ == "__main__":
 
     settings = get_settings()
-    mp.Process(target=WallMonitoringClass, args=(settings["user_token"],settings["group_id"], )).start()
+    mp.Process(target=WallMonitoringClass, args=(settings["user_token"],settings["group_id"], settings["mongodb_connection"], )).start()
     myclient = pymongo.MongoClient(settings["mongodb_connection"])
     mongo = myclient['MotoVKBot']
     MainClass(settings["group_token"], mongo)
