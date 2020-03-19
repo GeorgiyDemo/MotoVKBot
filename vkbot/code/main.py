@@ -1,24 +1,17 @@
 # https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
 #TODO Удаление пользователя по команде СТОП
 #TODO Разобраться с 10-15 шагом и как с этим жить
-#(/?:\s|^)#[A-Za-z0-9\-\.\_]+(?:\s|$)
 
-import re
 import pymongo
 import vk_api
-import yaml
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
 import time
 import requests
 import multiprocessing as mp
+import util_module
 from mongo_module import MongoUserClass, MongoMsgClass
-
-def get_settings():
-    """Чтение настроек с yaml"""
-    with open("./yaml/settings.yml", 'r') as stream:
-        return yaml.safe_load(stream)
 
 class WallMonitoringClass:
     def __init__(self, user_token, club_token, group, connection):
@@ -44,7 +37,8 @@ class WallMonitoringClass:
         for result in results["items"]:
             for tag in tags_list:
                 #Если есть тег и этой записи еще нет в БД
-                if tag in result["text"] and not self.mongo_user_obj.get_walldata("wall{}_{}".format(self.group,result["id"])):
+                print(util_module.wallpost_check(result["text"]))
+                if tag in util_module.wallpost_check(result["text"]) and not self.mongo_user_obj.get_walldata("wall{}_{}".format(self.group,result["id"])):
                     
                     user_lists = self.mongo_user_obj.get_usersbytags(tag)
                     wall_id = "wall{}_{}".format(self.group,result["id"])
@@ -196,15 +190,12 @@ class MainClass:
         #Занесение информации о модели
         moto_model = event.text
         self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 5}, {"moto_model": moto_model})
-
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Кастом',color=VkKeyboardColor.DEFAULT)
         keyboard.add_button('Сток', color=VkKeyboardColor.DEFAULT)
-
         message_str = self.mongo_msg_obj.get_message(5)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, "keyboard": keyboard.get_keyboard()})
-
 
     def step_6(self, event):
         """Обработка шага 6"""
@@ -216,7 +207,6 @@ class MainClass:
         time.sleep(2)
         self.step_8(event)
         
-
     def step_7(self, event):
         """Обработка шага 7"""
 
@@ -226,8 +216,6 @@ class MainClass:
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, 'attachment': photo_obj.photo_str}) #'attachment': "market-170171504_3154895"
         time.sleep(2)
         self.step_8(event)
-
-        #market-170171504?section=album_4
 
     def step_8(self, event):
         """Обработка шагов 8"""
@@ -288,7 +276,7 @@ class MainClass:
 
 if __name__ == "__main__":
 
-    settings = get_settings()
+    settings = util_module.get_settings()
     mp.Process(target=WallMonitoringClass, args=(settings["user_token"],settings["group_token"], settings["group_id"], settings["mongodb_connection"], )).start()
     myclient = pymongo.MongoClient(settings["mongodb_connection"])
     mongo = myclient['MotoVKBot']
