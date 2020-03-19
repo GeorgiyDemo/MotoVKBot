@@ -10,7 +10,6 @@ class MongoUserClass:
         """Получения id пользователей по определенной выборке тегов"""
         #Находим тег, берем данные и на основе этих данных отдаем id пользователей
         tag_fields_dict = self.tags_table.find_one({"name" : tag},{"_id": 0,"name": 0})
-        print("tag_fields_dict {}".format(tag_fields_dict))
         result = self.users_table.find(tag_fields_dict,{"_id": 0,"user_id": 1})
         if result != None:
             return [e["user_id"] for e in result]
@@ -66,6 +65,5 @@ class MongoMsgClass:
         self.table = connection["out_messages"]
     
     def get_message(self, step):
-        print("ПОПЫТКА ПОЛУЧИТЬ СООБЩЕНИЕ ДЛЯ ШАГА {}".format(step))
         result = self.table.find_one({"current_step": step}, {"message": 1, "_id": 0})
         return result["message"]

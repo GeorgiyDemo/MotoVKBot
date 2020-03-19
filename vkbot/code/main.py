@@ -37,7 +37,6 @@ class WallMonitoringClass:
         for result in results["items"]:
             for tag in tags_list:
                 #Если есть тег и этой записи еще нет в БД
-                print(util_module.wallpost_check(result["text"]))
                 if tag in util_module.wallpost_check(result["text"]) and not self.mongo_user_obj.get_walldata("wall{}_{}".format(self.group,result["id"])):
                     
                     user_lists = self.mongo_user_obj.get_usersbytags(tag)
@@ -89,8 +88,12 @@ class PhotoUploaderClass:
 
 
 class MainClass:
-    def __init__(self, token, connection):
+    def __init__(self, token, connection_str):
         
+        #Соединение с БД
+        myclient = pymongo.MongoClient(connection_str)
+        connection = myclient['MotoVKBot']
+
         # Авторизуемся как сообщество
         self.vk = vk_api.VkApi(token=token)
         #Взаимодействие с БД пользователей
@@ -136,8 +139,6 @@ class MainClass:
                     elif self.mongo_user_obj.get_current_step(event.user_id) == 4:
                         #Вызываем шаг 5
                         self.step_5(event)
-
-
                     else:
                         print("Неизвестная команда: '{}'".format(event.text))
 
@@ -230,7 +231,6 @@ class MainClass:
 
         #Получаем текущий шаг
         current_step = self.mongo_user_obj.get_current_step(event.user_id)
-        print("current_step :{}, {}".format(current_step,type(current_step)))
         
         #Если первое вхождение в 8 шаг
         if current_step == 7 or current_step == 6:
@@ -275,9 +275,9 @@ class MainClass:
 
 
 if __name__ == "__main__":
-
     settings = util_module.get_settings()
-    mp.Process(target=WallMonitoringClass, args=(settings["user_token"],settings["group_token"], settings["group_id"], settings["mongodb_connection"], )).start()
-    myclient = pymongo.MongoClient(settings["mongodb_connection"])
-    mongo = myclient['MotoVKBot']
-    MainClass(settings["group_token"], mongo)
+    p = mp.Process(target=WallMonitoringClass, args=(settings["user_token"],settings["group_token"], settings["group_id"], settings["mongodb_connection"], ))
+    p.start()
+    MainClass(settings["group_token"],settings["mongodb_connection"])
+    
+    
