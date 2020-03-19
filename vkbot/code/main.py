@@ -139,8 +139,8 @@ class MainClass:
                     elif self.mongo_user_obj.get_current_step(event.user_id) == 4:
                         #Вызываем шаг 5
                         self.step_5(event)
-                    else:
-                        print("Неизвестная команда: '{}'".format(event.text))
+                    
+                    print("Сообщение: '{}' от https://vk.com/id{}".format(event.text, event.user_id))
 
     def step_1(self, event):
         """Обработка шага 1"""
@@ -275,9 +275,23 @@ class MainClass:
 
 
 if __name__ == "__main__":
+    p_list = []
     settings = util_module.get_settings()
     p = mp.Process(target=WallMonitoringClass, args=(settings["user_token"],settings["group_token"], settings["group_id"], settings["mongodb_connection"], ))
     p.start()
-    MainClass(settings["group_token"],settings["mongodb_connection"])
+    p_list.append(p)
+    p = mp.Process(target=MainClass, args=(settings["group_token"],settings["mongodb_connection"], ))
+    p.start()
+    p_list.append(p)
     
+    #Ультракостыль, чтоб Docker в случае ошибки перезапускал скрипт
+    stop_flag = True
+    while stop_flag:
+        for proc in p_list:
+            if type(proc.exitcode) == int:
+                print('MAIN остановил работу!')
+                stop_flag = False
+        time.sleep(0.1)
     
+    for proc in p_list:
+        proc.terminate()
