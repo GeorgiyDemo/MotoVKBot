@@ -215,8 +215,6 @@ class MainClass:
         message_str = self.mongo_msg_obj.get_message(7)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/expendable.jpg")
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, 'attachment': photo_obj.photo_str}) #'attachment': "market-170171504_3154895"
-        time.sleep(2)
-        self.step_8(event)
 
     def step_8(self, event):
         """Обработка шагов 8"""
@@ -273,6 +271,8 @@ class MainClass:
         name = self.vk.method('users.get', {'user_id': user_id})[0]
         return name["first_name"], name["last_name"]
 
+    def step_10(self, user_id):
+        pass
 
 if __name__ == "__main__":
     p_list = []
