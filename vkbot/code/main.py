@@ -29,7 +29,7 @@ class WallMonitoringClass:
 
     # Мониторим последние 3 записи т.к может быть такое, что проставили хештеги проще
     def monitoring(self):
-        #TODO слоаврь пользователей и новости
+        #Словарь пользователей и новости
         user_alerts_dict = {}
         tags_list = self.mongo_user_obj.get_alltags()
         results = self.user_vk.method(
