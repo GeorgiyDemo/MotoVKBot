@@ -25,7 +25,7 @@ class WallMonitoringClass:
         while True:
             self.monitoring()
             self.user_alerting()
-            time.sleep(10)
+            time.sleep(60)
 
     # Мониторим последние 3 записи т.к может быть такое, что проставили хештеги проще
     def monitoring(self):
