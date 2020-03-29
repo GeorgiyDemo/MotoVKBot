@@ -437,14 +437,13 @@ if __name__ == "__main__":
     p_list = []
     settings = util_module.get_settings()
     p = mp.Process(target=WallMonitoringClass, args=(settings["user_token"],settings["group_token"], settings["group_id"], settings["mongodb_connection"], ))
-    p.start()
     p_list.append(p)
     p = mp.Process(target=MainClass, args=(settings["group_token"],settings["mongodb_connection"], ))
-    p.start()
     p_list.append(p)
     p = mp.Process(target=UserAlertClass, args=(settings["group_token"],settings["mongodb_connection"], ))
-    p.start()
     p_list.append(p)
+    for p in p_list:
+        p.start()
     
     #Ультракостыль, чтоб Docker в случае ошибки перезапускал скрипт
     stop_flag = True
