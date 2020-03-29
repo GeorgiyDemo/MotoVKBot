@@ -47,7 +47,7 @@ class MongoMainClass(MongoParentClass):
     def new_userdata(self, user_id, first_name, second_name, current_step):
         """Занесение начальных значений пользователя в БД"""
         self.users_table.insert_one({"user_id": user_id, "first_name": first_name, "second_name": second_name,
-                              "current_step": current_step, "moto_model": "-", "moto_type": "-", "price_type": "-", "priority_type":"-","coupon_5":"-","coupon_10":"-", "posts_send" : 0})
+                              "current_step": current_step, "moto_model": "-", "moto_type": "-", "price_type": "-", "priority_type":"-","coupon_5":"-","coupon_10":"-", "wish":"-", "posts_send" : 0})
 
     def inc_user_postssend(self, user_id):
         """Осуществляет инкремент кол-ва новостей (posts_send) для указанного пользователя"""
@@ -76,6 +76,12 @@ class MongoMainClass(MongoParentClass):
     def get_all_users(self):
         """Получение всех пользователей с БД"""
         return list(self.users_table.find())
+
+    def get_wishbyuser(self, user_id):
+        """Получение желания пользователя по его id"""
+        r = self.users_table.find_one({"user_id" : user_id},{"_id": 0, "wish" : 1})
+        return r["wish"]
+
 
 class MongoTTLClass(MongoParentClass):
     def __init__(self, connection_str):
