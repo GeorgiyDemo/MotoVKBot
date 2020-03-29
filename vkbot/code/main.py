@@ -79,16 +79,13 @@ class UserAlertClass:
             self.step12to13_checker() # 2 дня
             self.step16to17_checker() # 2 недели
             self.step19to20plus()   # 1 неделя
-            self.checker()
             time.sleep(30)
     
-
     def step6to11_checker(self):
         all_list = self.mongo_obj.get_all_users()
         for user in all_list:
-            if user["current_step"] == 6 and user["posts_send"] == 1:
+            if user["current_step"] == 6 and user["posts_send"] > 0:
                 self.step11_alter(user["user_id"])
-
 
     def step12to13_checker(self):
         """Проверка на переход от шага 12 к 13"""
@@ -121,7 +118,6 @@ class UserAlertClass:
                 user_wish = self.mongo_obj.get_wishbyuser(user["user_id"])
                 if user_wish in wish_dict:
                     wish_dict[user_wish](user["user_id"])
-
 
     def step11_alter(self, user_id):
         """
@@ -171,11 +167,7 @@ class UserAlertClass:
         self.mongo_obj.update_userdata(user_id, {"current_step": 22})
         message_str = self.mongo_msg_obj.get_message(22, user_id)
         self.group_vk.method('messages.send', {'user_id': user_id, 'random_id': get_random_id(), 'message': message_str})
-
-    def checker(self):
-        print("UserAlertClass: [Я ВЫПОЛНЯЮСЬ]")
         
-
 class PhotoUploaderClass:
     """Класс для загрузки фото в VK"""
 
