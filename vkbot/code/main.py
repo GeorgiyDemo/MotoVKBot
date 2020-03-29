@@ -1,6 +1,6 @@
 # https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
 #TODO Удаление пользователя по команде СТОП
-#TODO Разобраться с 10-15 шагом и как с этим жить
+#TODO Шаг 13+
 
 import pymongo
 import vk_api
@@ -56,10 +56,34 @@ class WallMonitoringClass:
             return
         for wall_id, users_list in d.items():
             for current_user in users_list:
+                #Отправляем новость
                 self.club_vk.method('messages.send', {'user_id': current_user, 'random_id': get_random_id(),'attachment': wall_id})
-                #TODO Выстявляем отсчет
+                #+1 пост для пользователя
+                self.mongo_user_obj.inc_user_postssend(current_user)
                 time.sleep(0.2)
 
+class UserAlertClass:
+    """Класс для оповещения пользователей спустя N времени"""
+    def __init__(self, token, connection_str):
+        while True:
+            #self.step6to11_checker()
+            #self.step12to13_checker() # 2 дня
+            #self.step15to16_checker() # 2 недели
+            #self.step18to19plus()   # 1 неделя
+            self.checker()
+            time.sleep(60)
+    
+    """
+    def step6to11_checker(self):
+        for пользователи in все пользователи в БД
+            if current_step == 6 and posts_send == 1:
+                переход к 11
+    """
+    def step12to13_checker(self):
+        if current_step == 12 and {users_ttl.transition} : "step12to13"} == None:
+
+    def checker(self):
+        print("UserAlertClass: [Я ВЫПОЛНЯЮСЬ]")
 
 class PhotoUploaderClass:
     """Класс для загрузки фото в VK"""
@@ -88,16 +112,6 @@ class PhotoUploaderClass:
             str(photo_final["owner_id"]) + "_" + str(photo_final["id"])
         self.__photo_str = photo_str
 
-
-class UserAlertClass:
-    """Класс для оповещения пользователей спустя N времени"""
-    def __init__(self, token, connection_str):
-        while True:
-            self.checker()
-            time.sleep(60)
-    
-    def checker(self):
-        print("UserAlertClass: [Я ВЫПОЛНЯЮСЬ]")
 
 class MainClass:
     def __init__(self, token, connection_str):
@@ -275,7 +289,7 @@ class MainClass:
         message_str = self.mongo_msg_obj.get_message(12, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
 
-
+        #TODO Выставляем TTL для users_ttl.step12to13
 
     def get_username(self, user_id):
         """Метод, возвращающий имя пользователя по id"""
