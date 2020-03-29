@@ -1,5 +1,5 @@
 import pymongo
-
+from datetime import datetime, timedelta
 
 
 class MongoParentClass:
@@ -72,22 +72,44 @@ class MongoMainClass(MongoParentClass):
         for e in items: 
             set_dict.update(e)
         self.users_table.update_one({"user_id": user_id}, {"$set": set_dict})
-
+    
+    def get_all_users(self):
+        """Получение всех пользователей с БД"""
+        return list(self.users_table.find())
 
 class MongoTTLClass(MongoParentClass):
     def __init__(self, connection_str):
         super().__init__(connection_str)
         self.ttl_table = self.connection["ttl"]
+        self.user_table = self.connection["users"]
+        self.settings_table = self.connection["settings"]
 
     def create_ttl_table(self):
         """Ставит ttl по полю date_expire"""
         self.ttl_table.create_index("date_expire", expireAfterSeconds=0)   
 
-    def set_ttl_table(self, time_ttl, field, user_id):
+    def get_ttl_table(self, user_system_id):
+        """Проверка на существование объекта в таблице"""
+
+        if self.ttl_table.find_one({"user_id": user_system_id}) == None:
+            return True
+        return False
+        
+    def set_ttl_table(self, field, user_id):
         """Установка временных полей"""
-        self.ttl_table.create_index
-        mongo_col.en("date", expireAfterSeconds=time_ttl)
-        mongo_col.insert({'_id': 'session', "date": timestamp, "session": "test session"})
+        
+        #Ищем id пользователя
+        user_system_id = self.user_table.find_one({"user_id": user_id},{"_id": 1})["_id"]
+        
+        #Ищем кол-во секунд в настройках
+        field_seconds = self.settings_table.find_one({"name" : field+"_time"})["value"]
+        
+        #Формируем дату
+        utc_timestamp = datetime.utcnow()
+        new_timestamp = utc_timestamp + timedelta(seconds=field_seconds)
+        
+        #Все это записываемм
+        self.ttl_table.insert_one({"user_id": user_system_id, "transition" : field, "date_expire" : new_timestamp})
 
 
 class MongoMsgClass(MongoParentClass):

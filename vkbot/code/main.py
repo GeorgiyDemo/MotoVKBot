@@ -28,7 +28,7 @@ class WallMonitoringClass:
 
     # Мониторим последние 3 записи т.к может быть такое, что проставили хештеги проще
     def monitoring(self):
-        #TODO слоаврь пользователей и новости
+        #Словарь пользователей и новости
         user_alerts_dict = {}
         tags_list = self.mongo_obj.get_alltags()
         results = self.user_vk.method(
@@ -65,17 +65,22 @@ class UserAlertClass:
     def __init__(self, token, connection_str):
         #Создаем табличку ttl и выставляем ttl для коллекции
         
+        self.group_vk = vk_api.VkApi(token=token)
+        
         #Соединение с БД
-        self.mongo_obj = MongoTTLClass(connection_str)
+        self.mongo_ttl_obj = MongoTTLClass(connection_str)
+        self.mongo_obj = MongoMainClass(connection_str)
+        self.mongo_msg_obj = MongoMsgClass(connection_str)
 
+        self.mongo_ttl_obj.create_ttl_table()
 
         while True:
-            #self.step6to11_checker()
-            #self.step12to13_checker() # 2 дня
+            #self.step6to11_checker() #как новость приедет
+            self.step12to13_checker() # 2 дня
             #self.step15to16_checker() # 2 недели
             #self.step18to19plus()   # 1 неделя
             self.checker()
-            time.sleep(60)
+            time.sleep(30)
     
     """
     def step6to11_checker(self):
@@ -84,10 +89,27 @@ class UserAlertClass:
                 переход к 11
     """
     def step12to13_checker(self):
-        if current_step == 12 and {users_ttl.transition} : "step12to13"} == None:
+        all_list = self.mongo_obj.get_all_users()
+        for user in all_list: 
+            if user["current_step"] == 12 and self.mongo_ttl_obj.get_ttl_table(user["_id"]):
+                #Отправляем сообщеньку и меняем шаг
+                self.step13(user["user_id"])
+
+    def step13(self, user_id):
+        """Обработка шага 13"""
+        message_str = self.mongo_msg_obj.get_message(13, user_id)
+
+        # Кнопки для VK
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('Да',color=VkKeyboardColor.DEFAULT)
+        keyboard.add_button('Нет', color=VkKeyboardColor.DEFAULT)
+       
+        self.group_vk.method('messages.send', {'user_id': user_id, 'random_id': get_random_id(), 'message': message_str, "keyboard": keyboard.get_keyboard()})
+        
 
     def checker(self):
         print("UserAlertClass: [Я ВЫПОЛНЯЮСЬ]")
+        
 
 class PhotoUploaderClass:
     """Класс для загрузки фото в VK"""
@@ -116,7 +138,6 @@ class PhotoUploaderClass:
             str(photo_final["owner_id"]) + "_" + str(photo_final["id"])
         self.__photo_str = photo_str
 
-
 class MainClass:
     def __init__(self, token, connection_str):
         
@@ -126,6 +147,8 @@ class MainClass:
         self.mongo_obj = MongoMainClass(connection_str)
         #Взаимодействие с исходящими сообщеньками в БД
         self.mongo_msg_obj = MongoMsgClass(connection_str)
+        #Выставление ожидания времени ttl в табличке
+        self.mongo_ttl_obj = MongoTTLClass(connection_str)
 
         #Сообщение и какой метод за него отвечает
         self.main_dict = {
@@ -141,6 +164,7 @@ class MainClass:
             "Цена" : self.step_11,
             "Качество" : self.step_11,
             "Получить купон" : self.step_12,
+            "Да" : self.step_14,
         }
 
         self.processing()
@@ -285,11 +309,17 @@ class MainClass:
 
     def step_12(self, event):
         """Обработка шага 12"""
-        self.mongo_obj.update_userdata(event.user_id, {"current_step": 12}, {"coupon_5": "seen"})
         message_str = self.mongo_msg_obj.get_message(12, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
+        
+        #Выставляем TTL для step12to13
 
-        #TODO Выставляем TTL для users_ttl.step12to13
+        self.mongo_ttl_obj.set_ttl_table("step12to13", event.user_id)
+        self.mongo_obj.update_userdata(event.user_id, {"current_step": 12}, {"coupon_5": "seen"})
+
+    def step_14(self, event):
+        """Обработка шага 14"""
+        
 
     def get_username(self, user_id):
         """Метод, возвращающий имя пользователя по id"""
