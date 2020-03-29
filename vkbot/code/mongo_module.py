@@ -36,7 +36,7 @@ class MongoUserClass:
     def new_userdata(self, user_id, first_name, second_name, current_step):
         """Занесение начальных значений пользователя в БД"""
         self.users_table.insert_one({"user_id": user_id, "first_name": first_name, "second_name": second_name,
-                              "current_step": current_step, "moto_model": "-", "moto_type": "-", "rudder_price": "-", "exhaustpipe_price":"-","wings_price":"-","optics_price":"-","all_price":"-"})
+                              "current_step": current_step, "moto_model": "-", "moto_type": "-", "price_type": "-", "priority_type":"-","coupon_5":"-","coupon_10":"-"})
 
     def get_current_step(self, user_id):
         """Получение текущего шага пользователя"""
@@ -67,12 +67,12 @@ class MongoMsgClass:
     def get_message(self, step, user_id):
         msg_table = self.connection["out_messages"]
         result = msg_table.find_one({"current_step": step}, {"message": 1, "_id": 0})["message"]
-        
+
         #Если есть {user_name}, то его надо заменить на имя пользователя с БД
-        if "{user_name}" in result:
+        if "{account_username}" in result:
             user_table = self.connection["users"]
             user_name = user_table.find_one({"user_id": user_id})["first_name"]
-            result.replace("{user_name}",user_name)
+            result = result.replace("{account_username}",user_name)
         return result
     
 

@@ -216,17 +216,17 @@ class MainClass:
     def step_6(self, event):
         """Обработка шага 6"""
         
-        self.mongo_user_obj.update_userdata(event.user_id, {"moto_type": "кастом"},{"current_step":6})
+        self.mongo_user_obj.update_userdata(event.user_id, {"moto_type": "сток"},{"current_step":6})
         message_str = self.mongo_msg_obj.get_message(6, event.user_id)
-        photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/custom.jpg")
+        photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/expendable.jpg")
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, 'attachment': photo_obj.photo_str})
         
     def step_7(self, event):
         """Обработка шага 7"""
 
-        self.mongo_user_obj.update_userdata(event.user_id, {"moto_type": "сток"},{"current_step":7})
+        self.mongo_user_obj.update_userdata(event.user_id, {"moto_type": "кастом"},{"current_step":7})
         message_str = self.mongo_msg_obj.get_message(7, event.user_id)
-        photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/expendable.jpg")
+        photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/custom.jpg")
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, 'attachment': photo_obj.photo_str}) #'attachment': "market-170171504_3154895"
         time.sleep(2)
         self.step_8(event)
@@ -260,9 +260,9 @@ class MainClass:
     def step_11(self, event):
         """Обработка шага 11"""
         #Занесение информации о приоритетах пользователя
-        priority_price = event.text
-        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 11}, {"priority_price": priority_price})
-        
+        priority_type = event.text
+        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 11}, {"priority_type": priority_type})
+
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Получить купон',color=VkKeyboardColor.DEFAULT)
 
