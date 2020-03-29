@@ -14,6 +14,7 @@ import util_module
 from mongo_module import MongoUserClass, MongoMsgClass
 
 class WallMonitoringClass:
+    """Класс в отдельном процессе для мониторинга стены"""
     def __init__(self, user_token, club_token, group, connection):
         self.user_vk = vk_api.VkApi(token=user_token)
         self.club_vk = vk_api.VkApi(token=club_token)
@@ -29,7 +30,7 @@ class WallMonitoringClass:
 
     # Мониторим последние 3 записи т.к может быть такое, что проставили хештеги проще
     def monitoring(self):
-        #Словарь пользователей и новости
+        #TODO слоаврь пользователей и новости
         user_alerts_dict = {}
         tags_list = self.mongo_user_obj.get_alltags()
         results = self.user_vk.method(
@@ -56,6 +57,7 @@ class WallMonitoringClass:
         for wall_id, users_list in d.items():
             for current_user in users_list:
                 self.club_vk.method('messages.send', {'user_id': current_user, 'random_id': get_random_id(),'attachment': wall_id})
+                #TODO Выстявляем отсчет
                 time.sleep(0.2)
 
 
@@ -86,6 +88,16 @@ class PhotoUploaderClass:
             str(photo_final["owner_id"]) + "_" + str(photo_final["id"])
         self.__photo_str = photo_str
 
+
+class UserAlertClass:
+    """Класс для оповещения пользователей спустя N времени"""
+    def __init__(self, token, connection_str):
+        while True:
+            self.checker()
+            time.sleep(60)
+    
+    def checker(self):
+        print("UserAlertClass: [Я ВЫПОЛНЯЮСЬ]")
 
 class MainClass:
     def __init__(self, token, connection_str):
@@ -281,6 +293,9 @@ if __name__ == "__main__":
     p.start()
     p_list.append(p)
     p = mp.Process(target=MainClass, args=(settings["group_token"],settings["mongodb_connection"], ))
+    p.start()
+    p_list.append(p)
+    p = mp.Process(target=UserAlertClass, args=(settings["group_token"],settings["mongodb_connection"], ))
     p.start()
     p_list.append(p)
     
