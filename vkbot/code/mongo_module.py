@@ -1,11 +1,21 @@
 import pymongo
-class MongoUserClass:
+
+
+
+class MongoParentClass:
+    """Родительский класс для установки соединения"""
+    def __init__(self, connection_str ):
+        myclient = pymongo.MongoClient(connection_str)
+        self.connection = myclient['MotoVKBot']
+
+class MongoMainClass(MongoParentClass):
     """Класс для работы с пользователями"""
-    def __init__(self, connection):
-        self.users_table = connection["users"]
-        self.tags_table = connection["tags"]
-        self.wall_table = connection["wall_archive"]
-        self.ttl_table = connection["ttl"]
+    def __init__(self, connection_str):
+        super().__init__(connection_str)
+        self.users_table = self.connection["users"]
+        self.tags_table = self.connection["tags"]
+        self.wall_table = self.connection["wall_archive"]
+        self.ttl_table = self.connection["ttl"]
 
     def get_usersbytags(self, tag):
         """Получения id пользователей по определенной выборке тегов"""
@@ -63,18 +73,29 @@ class MongoUserClass:
             set_dict.update(e)
         self.users_table.update_one({"user_id": user_id}, {"$set": set_dict})
 
-    #TODO
+
+class MongoTTLClass(MongoParentClass):
+    def __init__(self, connection_str):
+        super().__init__(connection_str)
+        self.ttl_table = self.connection["ttl"]
+
+    def create_ttl_table(self):
+        """Ставит ttl по полю date_expire"""
+        self.ttl_table.create_index("date_expire", expireAfterSeconds=0)   
+
     def set_ttl_table(self, time_ttl, field, user_id):
-        """Установка временных полей в ttl"""
+        """Установка временных полей"""
         self.ttl_table.create_index
         mongo_col.en("date", expireAfterSeconds=time_ttl)
         mongo_col.insert({'_id': 'session', "date": timestamp, "session": "test session"})
 
-class MongoMsgClass:
+
+class MongoMsgClass(MongoParentClass):
     """Класс для получения текста ответных сообщений в зависимости от шага"""
-    def __init__(self, connection):
-        self.msg_table = connection["out_messages"]
-        self.user_table = connection["users"]
+    def __init__(self, connection_str):
+        super().__init__(connection_str)
+        self.msg_table = self.connection["out_messages"]
+        self.user_table = self.connection["users"]
     
     def get_message(self, step, user_id):
         result = self.msg_table.find_one({"current_step": step}, {"message": 1, "_id": 0})["message"]
@@ -85,6 +106,3 @@ class MongoMsgClass:
             result = result.replace("{account_username}",user_name)
         
         return result
-    
-
-

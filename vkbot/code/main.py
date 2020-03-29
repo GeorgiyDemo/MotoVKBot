@@ -2,7 +2,6 @@
 #TODO Удаление пользователя по команде СТОП
 #TODO Шаг 13+
 
-import pymongo
 import vk_api
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkLongPoll, VkEventType
@@ -11,16 +10,15 @@ import time
 import requests
 import multiprocessing as mp
 import util_module
-from mongo_module import MongoUserClass, MongoMsgClass
+from mongo_module import MongoMainClass, MongoMsgClass, MongoTTLClass
 
 class WallMonitoringClass:
     """Класс в отдельном процессе для мониторинга стены"""
-    def __init__(self, user_token, club_token, group, connection):
+    def __init__(self, user_token, club_token, group, connection_str):
         self.user_vk = vk_api.VkApi(token=user_token)
         self.club_vk = vk_api.VkApi(token=club_token)
         #Взаимодействие с БД пользователей
-        myclient = pymongo.MongoClient(connection)
-        self.mongo_user_obj = MongoUserClass(myclient['MotoVKBot'])
+        self.mongo_obj = MongoMainClass(connection_str)
         self.group = group
         self.user_alerts_dict = {}
         while True:
@@ -32,19 +30,19 @@ class WallMonitoringClass:
     def monitoring(self):
         #TODO слоаврь пользователей и новости
         user_alerts_dict = {}
-        tags_list = self.mongo_user_obj.get_alltags()
+        tags_list = self.mongo_obj.get_alltags()
         results = self.user_vk.method(
             "wall.get", {"owner_id": self.group, "count": 3})
         for result in results["items"]:
             for tag in tags_list:
                 #Если есть тег и этой записи еще нет в БД
-                if tag in util_module.wallpost_check(result["text"]) and not self.mongo_user_obj.get_walldata("wall{}_{}".format(self.group,result["id"])):
+                if tag in util_module.wallpost_check(result["text"]) and not self.mongo_obj.get_walldata("wall{}_{}".format(self.group,result["id"])):
                     
-                    user_lists = self.mongo_user_obj.get_usersbytags(tag)
+                    user_lists = self.mongo_obj.get_usersbytags(tag)
                     wall_id = "wall{}_{}".format(self.group,result["id"])
                     user_alerts_dict[wall_id] = user_lists
                     #Выставляем данные в БД
-                    self.mongo_user_obj.set_walldata(wall_id, tag)
+                    self.mongo_obj.set_walldata(wall_id, tag)
         
         #Выставляем данные для user_alerting
         self.user_alerts_dict = user_alerts_dict
@@ -59,12 +57,18 @@ class WallMonitoringClass:
                 #Отправляем новость
                 self.club_vk.method('messages.send', {'user_id': current_user, 'random_id': get_random_id(),'attachment': wall_id})
                 #+1 пост для пользователя
-                self.mongo_user_obj.inc_user_postssend(current_user)
+                self.mongo_obj.inc_user_postssend(current_user)
                 time.sleep(0.2)
 
 class UserAlertClass:
     """Класс для оповещения пользователей спустя N времени"""
     def __init__(self, token, connection_str):
+        #Создаем табличку ttl и выставляем ttl для коллекции
+        
+        #Соединение с БД
+        self.mongo_obj = MongoTTLClass(connection_str)
+
+
         while True:
             #self.step6to11_checker()
             #self.step12to13_checker() # 2 дня
@@ -116,16 +120,12 @@ class PhotoUploaderClass:
 class MainClass:
     def __init__(self, token, connection_str):
         
-        #Соединение с БД
-        myclient = pymongo.MongoClient(connection_str)
-        connection = myclient['MotoVKBot']
-
         # Авторизуемся как сообщество
         self.vk = vk_api.VkApi(token=token)
         #Взаимодействие с БД пользователей
-        self.mongo_user_obj = MongoUserClass(connection)
+        self.mongo_obj = MongoMainClass(connection_str)
         #Взаимодействие с исходящими сообщеньками в БД
-        self.mongo_msg_obj = MongoMsgClass(connection)
+        self.mongo_msg_obj = MongoMsgClass(connection_str)
 
         #Сообщение и какой метод за него отвечает
         self.main_dict = {
@@ -165,7 +165,7 @@ class MainClass:
                     
                     
                     #Если нет, то это может быть модель мото с шага 4
-                    elif self.mongo_user_obj.get_current_step(event.user_id) == 4:
+                    elif self.mongo_obj.get_current_step(event.user_id) == 4:
                         #Вызываем шаг 5
                         self.step_5(event)
                     
@@ -175,8 +175,8 @@ class MainClass:
         """Обработка шага 1"""
         #Получаем имя пользователя
         first_name, second_name = self.get_username(event.user_id)
-        if not self.mongo_user_obj.search_userdata(event.user_id):
-            self.mongo_user_obj.new_userdata(event.user_id, first_name, second_name, 1)
+        if not self.mongo_obj.search_userdata(event.user_id):
+            self.mongo_obj.new_userdata(event.user_id, first_name, second_name, 1)
 
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
@@ -190,7 +190,7 @@ class MainClass:
 
     def step_2(self, event):
         """Обработка шага 2"""
-        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 2})
+        self.mongo_obj.update_userdata(event.user_id, {"current_step": 2})
         message_str = self.mongo_msg_obj.get_message(2, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
         #Т.к. у нас безусловный переход от 2 к 4 шагу
@@ -199,7 +199,7 @@ class MainClass:
 
     def step_3(self, event):
         """Обработка шага 3"""
-        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 3})
+        self.mongo_obj.update_userdata(event.user_id, {"current_step": 3})
         message_str = self.mongo_msg_obj.get_message(3, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
         #Т.к. у нас безусловный переход от 2 к 4 шагу
@@ -211,7 +211,7 @@ class MainClass:
         Обработка шага 4
         - Вызывается только от step_2/step_3
         """
-        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 4})
+        self.mongo_obj.update_userdata(event.user_id, {"current_step": 4})
         message_str = self.mongo_msg_obj.get_message(4, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
     
@@ -219,7 +219,7 @@ class MainClass:
         """Вызывается после того, как пользователь введет какой-либо текст после шага 4"""
         #Занесение информации о модели
         moto_model = event.text
-        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 5}, {"moto_model": moto_model})
+        self.mongo_obj.update_userdata(event.user_id, {"current_step": 5}, {"moto_model": moto_model})
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Кастом',color=VkKeyboardColor.DEFAULT)
@@ -230,7 +230,7 @@ class MainClass:
     def step_6(self, event):
         """Обработка шага 6"""
         
-        self.mongo_user_obj.update_userdata(event.user_id, {"moto_type": "сток"},{"current_step":6})
+        self.mongo_obj.update_userdata(event.user_id, {"moto_type": "сток"},{"current_step":6})
         message_str = self.mongo_msg_obj.get_message(6, event.user_id)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/expendable.jpg")
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, 'attachment': photo_obj.photo_str})
@@ -238,7 +238,7 @@ class MainClass:
     def step_7(self, event):
         """Обработка шага 7"""
 
-        self.mongo_user_obj.update_userdata(event.user_id, {"moto_type": "кастом"},{"current_step":7})
+        self.mongo_obj.update_userdata(event.user_id, {"moto_type": "кастом"},{"current_step":7})
         message_str = self.mongo_msg_obj.get_message(7, event.user_id)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/custom.jpg")
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, 'attachment': photo_obj.photo_str}) #'attachment': "market-170171504_3154895"
@@ -248,7 +248,7 @@ class MainClass:
     def step_8(self, event):
         """Обработка шага 8"""
 
-        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 8})
+        self.mongo_obj.update_userdata(event.user_id, {"current_step": 8})
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Дешево и сердито',color=VkKeyboardColor.DEFAULT)
@@ -262,7 +262,7 @@ class MainClass:
         """Обработка шага 9"""
         #Занесение информации о типе платежеспособности пользователя
         price_type = event.text
-        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 9}, {"price_type": price_type})
+        self.mongo_obj.update_userdata(event.user_id, {"current_step": 9}, {"price_type": price_type})
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Цена',color=VkKeyboardColor.DEFAULT)
@@ -275,7 +275,7 @@ class MainClass:
         """Обработка шага 11"""
         #Занесение информации о приоритетах пользователя
         priority_type = event.text
-        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 11}, {"priority_type": priority_type})
+        self.mongo_obj.update_userdata(event.user_id, {"current_step": 11}, {"priority_type": priority_type})
 
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Получить купон',color=VkKeyboardColor.DEFAULT)
@@ -285,7 +285,7 @@ class MainClass:
 
     def step_12(self, event):
         """Обработка шага 12"""
-        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 12}, {"coupon_5": "seen"})
+        self.mongo_obj.update_userdata(event.user_id, {"current_step": 12}, {"coupon_5": "seen"})
         message_str = self.mongo_msg_obj.get_message(12, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
 
