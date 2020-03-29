@@ -62,8 +62,18 @@ class MongoUserClass:
 class MongoMsgClass:
     """Класс для получения текста ответных сообщений в зависимости от шага"""
     def __init__(self, connection):
-        self.table = connection["out_messages"]
+        self.connection = connection
     
-    def get_message(self, step):
-        result = self.table.find_one({"current_step": step}, {"message": 1, "_id": 0})
-        return result["message"]
+    def get_message(self, step, user_id):
+        msg_table = self.connection["out_messages"]
+        result = msg_table.find_one({"current_step": step}, {"message": 1, "_id": 0})["message"]
+        
+        #Если есть {user_name}, то его надо заменить на имя пользователя с БД
+        if "{user_name}" in result:
+            user_table = self.connection["users"]
+            user_name = user_table.find_one({"user_id": user_id})["first_name"]
+            result.replace("{user_name}",user_name)
+        return result
+    
+
+

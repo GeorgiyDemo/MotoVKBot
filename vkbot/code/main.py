@@ -118,10 +118,16 @@ class MainClass:
             "Начать" : self.step_1,
             "Магазин" : self.step_2,
             "Чек-лист &quot;Трушного боббера&quot;" : self.step_3,
-            "Кастом" : self.step_6,
-            "Сток" : self.step_7,
+            "Кастом" : self.step_7,
+            "Сток" : self.step_6,
+            "Дешево и сердито" : self.step_9,
+            "Недорогой эксклюзив" : self.step_9,
+            "Дорогой эксклюзив" : self.step_9,
+            "Дорого-богато" : self.step_9,
+            "Цена" : self.step_11,
+            "Качество" : self.step_11,
+            "Получить купон" : self.step_12,
         }
-        self.eight_commands_list = ["0",'0-5000','5001-15000','15001+']
 
         self.processing()
 
@@ -143,9 +149,6 @@ class MainClass:
                     if event.text in self.main_dict:
                         self.main_dict[event.text](event)
                     
-                    #Возможно относится к одному из 8 пунктов
-                    elif 8 <= self.mongo_user_obj.get_current_step(event.user_id) < 9 and event.text in self.eight_commands_list:
-                        self.step_8(event)
                     
                     #Если нет, то это может быть модель мото с шага 4
                     elif self.mongo_user_obj.get_current_step(event.user_id) == 4:
@@ -168,13 +171,13 @@ class MainClass:
         
         # Загружаем фото
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/buttons.jpg")
-        message_str = "Привет, "+first_name+self.mongo_msg_obj.get_message(1)
+        message_str = self.mongo_msg_obj.get_message(1, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), "keyboard": keyboard.get_keyboard(), 'message': message_str, 'attachment': photo_obj.photo_str})
 
     def step_2(self, event):
         """Обработка шага 2"""
         self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 2})
-        message_str = self.mongo_msg_obj.get_message(2)
+        message_str = self.mongo_msg_obj.get_message(2, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
         #Т.к. у нас безусловный переход от 2 к 4 шагу
         time.sleep(2)
@@ -183,7 +186,7 @@ class MainClass:
     def step_3(self, event):
         """Обработка шага 3"""
         self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 3})
-        message_str = self.mongo_msg_obj.get_message(3)
+        message_str = self.mongo_msg_obj.get_message(3, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
         #Т.к. у нас безусловный переход от 2 к 4 шагу
         time.sleep(2)
@@ -195,7 +198,7 @@ class MainClass:
         - Вызывается только от step_2/step_3
         """
         self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 4})
-        message_str = self.mongo_msg_obj.get_message(4)
+        message_str = self.mongo_msg_obj.get_message(4, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
     
     def step_5(self, event):
@@ -207,77 +210,72 @@ class MainClass:
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Кастом',color=VkKeyboardColor.DEFAULT)
         keyboard.add_button('Сток', color=VkKeyboardColor.DEFAULT)
-        message_str = self.mongo_msg_obj.get_message(5)
+        message_str = self.mongo_msg_obj.get_message(5, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, "keyboard": keyboard.get_keyboard()})
 
     def step_6(self, event):
         """Обработка шага 6"""
         
         self.mongo_user_obj.update_userdata(event.user_id, {"moto_type": "кастом"},{"current_step":6})
-        message_str = self.mongo_msg_obj.get_message(6)
+        message_str = self.mongo_msg_obj.get_message(6, event.user_id)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/custom.jpg")
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, 'attachment': photo_obj.photo_str})
-        time.sleep(2)
-        self.step_8(event)
         
     def step_7(self, event):
         """Обработка шага 7"""
 
         self.mongo_user_obj.update_userdata(event.user_id, {"moto_type": "сток"},{"current_step":7})
-        message_str = self.mongo_msg_obj.get_message(7)
+        message_str = self.mongo_msg_obj.get_message(7, event.user_id)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/expendable.jpg")
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, 'attachment': photo_obj.photo_str}) #'attachment': "market-170171504_3154895"
         time.sleep(2)
         self.step_8(event)
 
     def step_8(self, event):
-        """Обработка шагов 8"""
-        #Ассоциация шага и поля-детали с БД
-        detail_step_dict = {
-            8.1 : "rudder_price",
-            8.2 : "exhaustpipe_price",
-            8.3 : "wings_price",
-            8.4 : "optics_price",
-            8.5 : "all_price",
-        }
+        """Обработка шага 8"""
 
-        #Получаем текущий шаг
-        current_step = self.mongo_user_obj.get_current_step(event.user_id)
-        
-        #Если первое вхождение в 8 шаг
-        if current_step == 7 or current_step == 6:
-            self.mongo_user_obj.update_userdata(event.user_id,{"current_step":8})
-            current_step = 8
-        else:
-            #Получаем цену
-            detail_price = event.text
-            #Обновляем данные по этому шагу
-            #Прибавляем шаг
-            current_step += 0.1
-            current_step = round(current_step, 1)
-            self.mongo_user_obj.update_userdata(event.user_id,{"current_step":current_step}, {detail_step_dict[current_step] : detail_price})
-        #Получаем сообщение, связанное с шагом
-        if current_step == 8.5:
-            self.step_9(event)
-            return
-
-        message_str = self.mongo_msg_obj.get_message(current_step)
-
+        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 8})
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
-        keyboard.add_button('0',color=VkKeyboardColor.DEFAULT)
-        keyboard.add_button('0-5000', color=VkKeyboardColor.DEFAULT)
-        keyboard.add_button('5001-15000', color=VkKeyboardColor.DEFAULT)
-        keyboard.add_button('15001+', color=VkKeyboardColor.DEFAULT)
-        message_str = self.mongo_msg_obj.get_message(current_step)
+        keyboard.add_button('Дешево и сердито',color=VkKeyboardColor.DEFAULT)
+        keyboard.add_button('Недорогой эксклюзив', color=VkKeyboardColor.DEFAULT)
+        keyboard.add_button('Дорогой эксклюзив', color=VkKeyboardColor.DEFAULT)
+        keyboard.add_button('Дорого-богато', color=VkKeyboardColor.DEFAULT)
+        message_str = self.mongo_msg_obj.get_message(8, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, "keyboard": keyboard.get_keyboard()})
 
     def step_9(self, event):
         """Обработка шага 9"""
+        #Занесение информации о типе платежеспособности пользователя
+        price_type = event.text
+        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 9}, {"price_type": price_type})
+        # Кнопки для VK
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('Цена',color=VkKeyboardColor.DEFAULT)
+        keyboard.add_button('Качество', color=VkKeyboardColor.DEFAULT)
+
+        message_str = self.mongo_msg_obj.get_message(9, event.user_id)
+        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, "keyboard": keyboard.get_keyboard()})
+
+    def step_11(self, event):
+        """Обработка шага 11"""
+        #Занесение информации о приоритетах пользователя
+        priority_price = event.text
+        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 11}, {"priority_price": priority_price})
         
-        #Занесение информация о цене:
-        message_str = self.mongo_msg_obj.get_message(9)
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('Получить купон',color=VkKeyboardColor.DEFAULT)
+
+        message_str = self.mongo_msg_obj.get_message(11, event.user_id)
+        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, "keyboard": keyboard.get_keyboard()})
+
+    def step_12(self, event):
+        """Обработка шага 12"""
+        self.mongo_user_obj.update_userdata(event.user_id, {"current_step": 12}, {"coupon_5": "seen"})
+        message_str = self.mongo_msg_obj.get_message(12, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
+
+
 
     def get_username(self, user_id):
         """Метод, возвращающий имя пользователя по id"""
