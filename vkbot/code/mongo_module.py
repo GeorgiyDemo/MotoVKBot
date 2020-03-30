@@ -81,6 +81,10 @@ class MongoMainClass(MongoParentClass):
         """Получение желания пользователя по его id"""
         r = self.users_table.find_one({"user_id" : user_id},{"_id": 0, "wish" : 1})
         return r["wish"]
+    
+    def remove_userdata(self, user_id):
+        """Удаление пользователя с БД"""
+        self.users_table.delete_one({"user_id" : user_id})
 
 
 class MongoTTLClass(MongoParentClass):

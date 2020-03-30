@@ -264,8 +264,11 @@ class MainClass:
         """Обработка шага 1"""
         #Получаем имя пользователя
         first_name, second_name = self.get_username(event.user_id)
-        if not self.mongo_obj.search_userdata(event.user_id):
-            self.mongo_obj.new_userdata(event.user_id, first_name, second_name, 1)
+        if self.mongo_obj.search_userdata(event.user_id):
+            #Удаление пользователя
+            self.mongo_obj.remove_userdata(event.user_id)
+
+        self.mongo_obj.new_userdata(event.user_id, first_name, second_name, 1)
 
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
@@ -279,6 +282,8 @@ class MainClass:
 
     def step_2(self, event):
         """Обработка шага 2"""
+        if self.mongo_obj.get_current_step(event.user_id) != 1:
+            return 
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 2})
         message_str = self.mongo_msg_obj.get_message(2, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
@@ -341,8 +346,11 @@ class MainClass:
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Дешево и сердито',color=VkKeyboardColor.DEFAULT)
+        keyboard.add_line()
         keyboard.add_button('Недорогой эксклюзив', color=VkKeyboardColor.DEFAULT)
+        keyboard.add_line()
         keyboard.add_button('Дорогой эксклюзив', color=VkKeyboardColor.DEFAULT)
+        keyboard.add_line()
         keyboard.add_button('Дорого-богато', color=VkKeyboardColor.DEFAULT)
         message_str = self.mongo_msg_obj.get_message(8, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, "keyboard": keyboard.get_keyboard()})
@@ -375,7 +383,8 @@ class MainClass:
     def step_12(self, event):
         """Обработка шага 12"""
         message_str = self.mongo_msg_obj.get_message(12, event.user_id)
-        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
+        photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/coupon_5.jpg")
+        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, 'attachment': photo_obj.photo_str})
         
         #Выставляем TTL для step12to13
         self.mongo_ttl_obj.set_ttl_table("step12to13", event.user_id)
@@ -401,7 +410,8 @@ class MainClass:
     def step_16(self, event):
         """Обработка шага 16"""
         message_str = self.mongo_msg_obj.get_message(16, event.user_id)
-        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
+        photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/coupon_10.jpg")
+        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, 'attachment': photo_obj.photo_str})
         
         #Выставляем TTL для step16to17
         self.mongo_ttl_obj.set_ttl_table("step16to17", event.user_id)
@@ -413,8 +423,11 @@ class MainClass:
         message_str = self.mongo_msg_obj.get_message(18, event.user_id)
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Дать другие товары',color=VkKeyboardColor.DEFAULT)
+        keyboard.add_line()
         keyboard.add_button('Понизить цены', color=VkKeyboardColor.DEFAULT)
+        keyboard.add_line()
         keyboard.add_button('Повысить качество', color=VkKeyboardColor.DEFAULT)
+        keyboard.add_line()
         keyboard.add_button('Мне это не интересно', color=VkKeyboardColor.DEFAULT)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, "keyboard": keyboard.get_keyboard()})
     
