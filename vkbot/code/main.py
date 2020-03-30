@@ -210,6 +210,10 @@ class MainClass:
         #Сообщение и какой метод за него отвечает
         self.main_dict = {
             "Начать" : self.step_1,
+            "начать" : self.step_1,
+            "начало" : self.step_1,
+            "Начало" : self.step_1,
+            "Старт" : self.step_1,
             "Магазин" : self.step_2,
             "Чек-лист &quot;Трушного боббера&quot;" : self.step_3,
             "Кастом" : self.step_7,
@@ -282,8 +286,8 @@ class MainClass:
 
     def step_2(self, event):
         """Обработка шага 2"""
-        if self.mongo_obj.get_current_step(event.user_id) != 1:
-            return 
+        if self.step_controller(event.user_id,1):
+            return
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 2})
         message_str = self.mongo_msg_obj.get_message(2, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
@@ -293,10 +297,12 @@ class MainClass:
 
     def step_3(self, event):
         """Обработка шага 3"""
+        if self.step_controller(event.user_id,1):
+            return
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 3})
         message_str = self.mongo_msg_obj.get_message(3, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
-        #Т.к. у нас безусловный переход от 2 к 4 шагу
+        #Т.к. у нас безусловный переход от 3 к 4 шагу
         time.sleep(2)
         self.step_4(event)
     
@@ -305,12 +311,16 @@ class MainClass:
         Обработка шага 4
         - Вызывается только от step_2/step_3
         """
+        if self.step_controller(event.user_id,2,3):
+            return
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 4})
         message_str = self.mongo_msg_obj.get_message(4, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
     
     def step_5(self, event):
         """Вызывается после того, как пользователь введет какой-либо текст после шага 4"""
+        if self.step_controller(event.user_id,4):
+            return
         #Занесение информации о модели
         moto_model = event.text
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 5}, {"moto_model": moto_model})
@@ -323,7 +333,8 @@ class MainClass:
 
     def step_6(self, event):
         """Обработка шага 6"""
-        
+        if self.step_controller(event.user_id,5):
+            return
         self.mongo_obj.update_userdata(event.user_id, {"moto_type": "сток"},{"current_step":6})
         message_str = self.mongo_msg_obj.get_message(6, event.user_id)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/expendable.jpg")
@@ -331,7 +342,8 @@ class MainClass:
         
     def step_7(self, event):
         """Обработка шага 7"""
-
+        if self.step_controller(event.user_id,5):
+            return
         self.mongo_obj.update_userdata(event.user_id, {"moto_type": "кастом"},{"current_step":7})
         message_str = self.mongo_msg_obj.get_message(7, event.user_id)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/custom.jpg")
@@ -341,7 +353,8 @@ class MainClass:
 
     def step_8(self, event):
         """Обработка шага 8"""
-
+        if self.step_controller(event.user_id,7):
+            return
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 8})
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
@@ -357,6 +370,8 @@ class MainClass:
 
     def step_9(self, event):
         """Обработка шага 9"""
+        if self.step_controller(event.user_id,8):
+            return
         #Занесение информации о типе платежеспособности пользователя
         price_type = event.text
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 9}, {"price_type": price_type})
@@ -370,6 +385,8 @@ class MainClass:
 
     def step_11(self, event):
         """Обработка шага 11"""
+        if self.step_controller(event.user_id,9):
+            return
         #Занесение информации о приоритетах пользователя
         priority_type = event.text
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 11}, {"priority_type": priority_type})
@@ -382,6 +399,8 @@ class MainClass:
 
     def step_12(self, event):
         """Обработка шага 12"""
+        if self.step_controller(event.user_id,11):
+            return
         message_str = self.mongo_msg_obj.get_message(12, event.user_id)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/coupon_5.jpg")
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, 'attachment': photo_obj.photo_str})
@@ -392,6 +411,8 @@ class MainClass:
 
     def step_14(self, event):
         """Обработка шага 14"""
+        if self.step_controller(event.user_id,13,17):
+            return
         if self.mongo_obj.get_current_step(event.user_id) == 17:
             self.mongo_obj.update_userdata(event.user_id, {"current_step": 14}, {"coupon_10": "true"})
         else:
@@ -401,6 +422,8 @@ class MainClass:
 
     def step_15(self, event):
         """Обработка шага 15"""
+        if self.step_controller(event.user_id,13):
+            return
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 15}, {"coupon_5": "false"})
         message_str = self.mongo_msg_obj.get_message(15, event.user_id)
         keyboard = VkKeyboard(one_time=True)
@@ -409,6 +432,8 @@ class MainClass:
 
     def step_16(self, event):
         """Обработка шага 16"""
+        if self.step_controller(event.user_id,15):
+            return
         message_str = self.mongo_msg_obj.get_message(16, event.user_id)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/coupon_10.jpg")
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, 'attachment': photo_obj.photo_str})
@@ -419,6 +444,8 @@ class MainClass:
 
     def step_18(self, event):
         """Обработка шага 18"""
+        if self.step_controller(event.user_id,17):
+            return
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 18}, {"coupon_10": "false"})
         message_str = self.mongo_msg_obj.get_message(18, event.user_id)
         keyboard = VkKeyboard(one_time=True)
@@ -432,6 +459,8 @@ class MainClass:
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, "keyboard": keyboard.get_keyboard()})
     
     def step_19(self, event):
+        if self.step_controller(event.user_id,18):
+            return
         wish = event.text
         message_str = self.mongo_msg_obj.get_message(19, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
@@ -444,6 +473,14 @@ class MainClass:
         """Метод, возвращающий имя пользователя по id"""
         name = self.vk.method('users.get', {'user_id': user_id})[0]
         return name["first_name"], name["last_name"]
+
+    def step_controller(self, user_id, *ids):
+        """Метод для контроля перехода шагов"""
+        detect_flag = True
+        for id_ in ids:
+            if self.mongo_obj.get_current_step(user_id) == id_:
+                detect_flag = False
+        return detect_flag
 
 
 if __name__ == "__main__":
