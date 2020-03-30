@@ -1,6 +1,5 @@
 # https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
 # TODO Удаление пользователя по команде СТОП
-# TODO Шаг 15+
 
 import multiprocessing as mp
 import time
