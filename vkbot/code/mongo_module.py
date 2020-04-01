@@ -20,6 +20,7 @@ class MongoMainClass(MongoParentClass):
         self.tags_table = self.connection["tags"]
         self.wall_table = self.connection["wall_archive"]
         self.ttl_table = self.connection["ttl"]
+        self.settings_table = self.connection["settings"]
 
     def get_usersbytags(self, tag):
         """Получения id пользователей по определенной выборке тегов"""
@@ -91,6 +92,14 @@ class MongoMainClass(MongoParentClass):
     def remove_userdata(self, user_id):
         """Удаление пользователя с БД"""
         self.users_table.delete_one({"user_id": user_id})
+    
+    def get_namebyuserid(self, user_id):
+        """Получение имени пользователя по его id"""
+        return self.users_table.find_one({"user_id": user_id})["first_name"]
+
+    def get_replaceword(self):
+        """Получение слова для его последующей замены на имя пользователя"""
+        return self.settings_table.find_one({"name": "replace_word"})["value"]
 
 
 class MongoTTLClass(MongoParentClass):

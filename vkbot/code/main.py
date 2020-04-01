@@ -30,38 +30,100 @@ class WallMonitoringClass:
     # Мониторим последние 3 записи т.к может быть такое, что проставили хеги на соседний записях или сделали закреп записи
     def monitoring(self):
         # Словарь пользователей и новости
-        user_alerts_dict = {}
+        user_alerts_list = []
         tags_list = self.mongo_obj.get_alltags()
         results = self.user_vk.method(
             "wall.get", {"owner_id": self.group, "count": 3})
         for result in results["items"]:
             for tag in tags_list:
                 # Если есть тег и этой записи еще нет в БД
-                if tag in util_module.wallpost_check(result["text"]) and not self.mongo_obj.get_walldata(
-                        "wall{}_{}".format(self.group, result["id"])):
+                if tag in util_module.wallpost_check(result["text"]) and not self.mongo_obj.get_walldata("wall{}_{}".format(self.group, result["id"])):
                     user_lists = self.mongo_obj.get_usersbytags(tag)
                     wall_id = "wall{}_{}".format(self.group, result["id"])
-                    user_alerts_dict[wall_id] = user_lists
+                    user_alerts_list.append({"user_lists" : user_lists, "data" : result})
                     # Выставляем данные в БД
                     self.mongo_obj.set_walldata(wall_id, tag)
 
         # Выставляем данные для user_alerting
-        self.user_alerts_dict = user_alerts_dict
+        self.user_alerts_list = user_alerts_list
 
     def user_alerting(self):
         """Метод для оповещения пользователей"""
-        d = self.user_alerts_dict
-        if len(d) == 0:
-            return
-        for wall_id, users_list in d.items():
-            for current_user in users_list:
-                # Отправляем новость
-                self.club_vk.method('messages.send',
-                                    {'user_id': current_user, 'random_id': get_random_id(), 'attachment': wall_id})
+        locale_list = self.user_alerts_list
+        #Если некого оповещать
+        if len(locale_list) == 0:
+            return 
+
+        for wallpost in locale_list:
+            current_locale_data = wallpost["data"]
+            current_users_list = wallpost["user_lists"]
+            
+            #Формируем аттач и dict сообщений по пользователям
+            users_msg_dict, attachments_str = self.wallpost2message(current_locale_data, current_users_list) 
+            
+            #Отправляем сообщение каждому пользователю
+            for user_id, msg in users_msg_dict.items():
+                self.club_vk.method('messages.send', {'user_id': user_id, 'random_id': get_random_id(), 'message': msg,'attachment': attachments_str})
                 # +1 пост для пользователя
-                self.mongo_obj.inc_user_postssend(current_user)
+                self.mongo_obj.inc_user_postssend(user_id)
                 time.sleep(0.2)
 
+    def wallpost2message(self, locale_d, users_list):
+        """
+        Метод для конвертации поста на стене в ЛС
+        - получает settings.replace_word, если оно есть в тексте - меняет на имя пользователя
+        - Удаляет теги с сообщения
+        - Переносит аттачи со стены в ЛС
+        """
+        #Это чтоб фильтровать links
+        allowed_types = ["photo", "video", "audio", "doc", "market"]
+        users_msg_dict = {}
+        
+        #Формируем список вложений с поста
+        attachments_list = []
+        if "attachments" in locale_d:
+            for attachment in locale_d["attachments"]:
+                print(attachment)
+                a_type = attachment["type"]
+                if a_type in allowed_types:
+                    attachment_str = "{}{}_{}".format(a_type, attachment[a_type]["owner_id"], attachment[a_type]["id"])
+                    attachments_list.append(attachment_str)
+
+            attachments_str = ",".join(attachments_list)
+            print(attachments_str)
+        else:
+            attachments_str = ""
+        #Формируем сообщение, если надо
+        if locale_d["text"] != "":
+            post_text = locale_d["text"]
+            
+            #Удаляем теги
+            tags_list = util_module.wallpost_check(post_text)
+            for tag in tags_list:
+                post_text = post_text.replace(tag, "")
+
+            #Слово, которое необходимо заменить на имя пользователя
+            replace_word = self.mongo_obj.get_replaceword()
+            
+            #Если есть слово-замена в посте
+            if replace_word in post_text:
+                
+                #Для каждого пользователя меняем слово-замену на его имя  
+                for user_id in users_list:
+                    new_text = post_text.replace("replace_word", self.mongo_obj.get_namebyuserid(user_id), 1)
+                    users_msg_dict[user_id] = new_text
+
+            else:
+                #Просто проставляем для каждого пользователя все одно и то же
+                for user_id in users_list:
+                    users_msg_dict[user_id] = post_text
+
+        else:
+            for user_id in users_list:
+                users_msg_dict[user_id] = "post_text"
+        
+        #Возвращаем словарь сообщений и аттачей
+        return users_msg_dict, attachments_str
 
 class UserAlertClass:
     """Класс для оповещения пользователей спустя N времени"""
