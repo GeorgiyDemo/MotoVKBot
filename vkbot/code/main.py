@@ -293,7 +293,7 @@ class MainClass:
         #Купоны
         self.mongo_coupon_obj = MongoCouponClass(connection_str)
         # Сообщение и какой метод за него отвечает
-        self.main_dict = {
+        self.usercommands_dict = {
             "Начать": self.step_1,
             "начать": self.step_1,
             "начало": self.step_1,
@@ -301,20 +301,15 @@ class MainClass:
             "Старт": self.step_1,
             "Магазин": self.step_2,
             "Чек-лист &quot;Трушного боббера&quot;": self.step_3,
-
             "Yamaha Drag Star 1100" : self.step_6,
             "Yamaha Drag Star 400/650" : self.step_6,
             "Honda Steed 400/600" : self.step_6,
             "Другая" : self.step_5,
-
             "Кастом": self.step_8,
             "Сток": self.step_7,
-
             "Раздел расходники" : self.step_12,
             "Все товары" : self.step_13,
             "Раздел товаров кастом" : self.step_9,
-
-           
             "Дешево и сердито": self.step_11,
             "Недорогой эксклюзив": self.step_11,
             "Дорогой эксклюзив": self.step_11,
@@ -322,11 +317,15 @@ class MainClass:
             "Цена": self.step_14,
             "Качество": self.step_14,
             "Да": self.step_17,
-
             "Дать другие товары" : self.step_22,
             "Понизить цены" : self.step_22,
             "Повысить качество" : self.step_22,
             "Мне это не интересно" : self.step_22,
+        }
+
+        self.admincommands_dict = {
+            "/user_info" : self.admincommand_userinfo,
+            "/stats" : self.admincommand_stats,
         }
 
         self.processing()
@@ -345,9 +344,9 @@ class MainClass:
                 # Если оно имеет метку для бота
                 if event.to_me:
 
-                    # Если текст есть в словаре self.main_dict, отвечающем за ассоциацию
-                    if event.text in self.main_dict:
-                        self.main_dict[event.text](event)
+                    # Если текст есть в словаре self.usercommands_dict, отвечающем за ассоциацию
+                    if event.text in self.usercommands_dict:
+                        self.usercommands_dict[event.text](event)
 
                     # Если нет, то это может быть модель мото с шага 5
                     elif self.mongo_obj.get_current_step(event.user_id) == 5:
@@ -364,6 +363,12 @@ class MainClass:
                         self.step_15(event)
                     elif event.text == "Получить купон" and self.mongo_obj.get_current_step(event.user_id) == 18:
                         self.step_19(event)
+
+                    #Значит это может быть какая-то админская команда
+                    elif self.mongo_coupon_obj.check_admin(event.user_id):
+                        for command in self.admincommands_dict:
+                            if command in event.text:
+                                self.admincommands_dict[command](event)
 
                     print("Сообщение: '{}' от https://vk.com/id{}".format(event.text, event.user_id))
 
@@ -645,6 +650,25 @@ class MainClass:
         # Выставляем TTL для step19to20
         self.mongo_ttl_obj.set_ttl_table("step22to23plus", event.user_id)
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 22}, {"wish": wish})
+
+    #TODO Сделать команду для получения информации
+    def admincommand_userinfo(self, event):
+        """Команда админа для получения информации о пользователе"""
+
+        try:
+            _, user_link = event.text.split(" ")
+            #Получаем id пользователя, если это ссылка
+            if user_link
+            vk.com/dev/users.get
+            user_link
+            #Из ссылки получить id
+            if self.mongo_coupon_obj.search_userdata()
+        except:
+            #Неверный ввод данных
+    
+    def admincommand_stats(self, event):
+        """Команда админа для получения информации о пользователе"""
+        pass
 
     def get_username(self, user_id):
         """Метод, возвращающий имя пользователя по id"""
