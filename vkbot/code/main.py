@@ -78,7 +78,8 @@ class WallMonitoringClass:
         #Это чтоб фильтровать links
         allowed_types = ["photo", "video", "audio", "doc", "market"]
         users_msg_dict = {}
-        
+        url_str = ""
+
         #Формируем список вложений с поста
         attachments_list = []
         if "attachments" in locale_d:
@@ -88,11 +89,15 @@ class WallMonitoringClass:
                 if a_type in allowed_types:
                     attachment_str = "{}{}_{}".format(a_type, attachment[a_type]["owner_id"], attachment[a_type]["id"])
                     attachments_list.append(attachment_str)
+                #Отдельная обработка ссылки, т.к. там поля другие
+                elif a_type == "link":
+                    url_str = attachment["link"]["url"]
 
             attachments_str = ",".join(attachments_list)
             print(attachments_str)
         else:
             attachments_str = ""
+            
         #Формируем сообщение, если надо
         if locale_d["text"] != "":
             post_text = locale_d["text"]
@@ -107,20 +112,18 @@ class WallMonitoringClass:
             
             #Если есть слово-замена в посте
             if replace_word in post_text:
-                
+
                 #Для каждого пользователя меняем слово-замену на его имя  
                 for user_id in users_list:
                     new_text = post_text.replace("replace_word", self.mongo_obj.get_namebyuserid(user_id), 1)
-                    users_msg_dict[user_id] = new_text
-
+                    users_msg_dict[user_id] = new_text+"\n" + url_str
             else:
                 #Просто проставляем для каждого пользователя все одно и то же
                 for user_id in users_list:
-                    users_msg_dict[user_id] = post_text
-
+                    users_msg_dict[user_id] = post_text+"\n" + url_str
         else:
             for user_id in users_list:
-                users_msg_dict[user_id] = "post_text"
+                users_msg_dict[user_id] = ""+"\n" + url_str
         
         #Возвращаем словарь сообщений и аттачей
         return users_msg_dict, attachments_str
