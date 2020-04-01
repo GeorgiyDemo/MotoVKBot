@@ -27,7 +27,7 @@ class WallMonitoringClass:
             self.user_alerting()
             time.sleep(60)
 
-    # Мониторим последние 3 записи т.к может быть такое, что проставили хештеги проще
+    # Мониторим последние 3 записи т.к может быть такое, что проставили хеги на соседний записях или сделали закреп записи
     def monitoring(self):
         # Словарь пользователей и новости
         user_alerts_dict = {}
@@ -114,6 +114,7 @@ class UserAlertClass:
             "Дать другие товары": self.step_23,
             "Понизить цены": self.step_24,
             "Повысить качество": self.step_25,
+            "Мне это не интересно" : self.step_26,
         }
 
         all_list = self.mongo_obj.get_all_users()
@@ -178,6 +179,10 @@ class UserAlertClass:
         self.group_vk.method('messages.send',
                              {'user_id': user_id, 'random_id': get_random_id(), 'message': message_str})
 
+    def step_26(self, user_id):
+        """Заглушка для варианта 'Мне это не интересно'"""
+        self.mongo_obj.update_userdata(user_id, {"current_step": 26})
+
 
 class PhotoUploaderClass:
     """Класс для загрузки фото в VK"""
@@ -236,8 +241,11 @@ class MainClass:
 
             "Кастом": self.step_8,
             "Сток": self.step_7,
+
             "Раздел расходники" : self.step_12,
-            "Все товары" : self.step_13, 
+            "Все товары" : self.step_13,
+            "Раздел товаров кастом" : self.step_9,
+
            
             "Дешево и сердито": self.step_11,
             "Недорогой эксклюзив": self.step_11,
@@ -322,7 +330,7 @@ class MainClass:
         self.vk.method('messages.send',
                        {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
         # Т.к. у нас безусловный переход от 2 к 4 шагу
-        time.sleep(2)
+        time.sleep(1)
         self.step_4(event)
 
     def step_3(self, event):
@@ -334,7 +342,7 @@ class MainClass:
         self.vk.method('messages.send',
                        {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
         # Т.к. у нас безусловный переход от 3 к 4 шагу
-        time.sleep(2)
+        time.sleep(1)
         self.step_4(event)
 
     def step_4(self, event):
@@ -383,8 +391,8 @@ class MainClass:
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 6}, {"moto_model": moto_model})
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
-        keyboard.add_button('Кастом', color=VkKeyboardColor.DEFAULT)
         keyboard.add_button('Сток', color=VkKeyboardColor.DEFAULT)
+        keyboard.add_button('Кастом', color=VkKeyboardColor.DEFAULT)
         message_str = self.mongo_msg_obj.get_message(6, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, "keyboard": keyboard.get_keyboard()})
 
@@ -413,7 +421,7 @@ class MainClass:
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/custom.jpg")
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str,
                                          'attachment': photo_obj.photo_str, "keyboard": keyboard.get_keyboard()})
-        time.sleep(2)
+        time.sleep(1)
         self.step_8(event)
 
     def step_9(self, event):
