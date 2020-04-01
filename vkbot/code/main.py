@@ -1,9 +1,8 @@
 # https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
 # TODO Удаление пользователя по команде СТОП
-# TODO ренейм всех шагов
+
 import multiprocessing as mp
 import time
-
 import requests
 import util_module
 import vk_api
@@ -497,7 +496,7 @@ class MainClass:
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str,
                                          'attachment': photo_obj.photo_str})
 
-        # TODO Выставляем TTL для step15to16
+        # Выставляем TTL для step15to16
         self.mongo_ttl_obj.set_ttl_table("step15to16", event.user_id)
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 15}, {"coupon_5": "seen"})
 
@@ -532,7 +531,7 @@ class MainClass:
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str,
                                          'attachment': photo_obj.photo_str})
 
-        # TODO Выставляем TTL для step19to20
+        # Выставляем TTL для step19to20
         self.mongo_ttl_obj.set_ttl_table("step19to20", event.user_id)
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 19}, {"coupon_10": "seen"})
 
@@ -555,7 +554,7 @@ class MainClass:
 
     def step_22(self, event):
         """Обработка шага 22"""
-        if self.step_controller(event.user_id, 18):
+        if self.step_controller(event.user_id, 21):
             return
         wish = event.text
         message_str = self.mongo_msg_obj.get_message(22, event.user_id)
