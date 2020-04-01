@@ -160,6 +160,7 @@ class MongoCouponClass(MongoMainClass):
     def __init_(self, connection_str):
         super().__init__(connection_str)
         self.coupon_table = self.connection["coupons"]
+        self.admin_table = self.connection["admins"]
     
     def create_ttl_table(self):
         """Ставит ttl по полю date_expire"""
@@ -212,3 +213,12 @@ class MongoCouponClass(MongoMainClass):
             return True
         #Иначе купон уже истек
         return False
+
+    def check_admin(self, user_id):
+        """Проверка пользователя на админа"""
+        if self.admin_table.find_one({"user_id" : user_id}) != None:
+            return True
+        return False
+        #self.search_userdata
+        #self.check_coupon5
+        #self.check_coupon10
