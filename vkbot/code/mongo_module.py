@@ -155,16 +155,15 @@ class MongoMsgClass(MongoParentClass):
 
         return result
 
+#TODO МАКСИМАЛЬНО СТРАННАЯ ОШИБКА, как-будто конструктор не выполняется
 class MongoCouponClass(MongoMainClass):
     """Класс для определения валидных купонов пользователя"""
     def __init_(self, connection_str):
         super().__init__(connection_str)
+        print("ВЫПОЛНИЛСЯ")
         self.coupon_table = self.connection["coupons"]
         self.admin_table = self.connection["admins"]
-    
-    def create_ttl_table(self):
-        """Ставит ttl по полю date_expire"""
-        self.coupon_table.create_index("date_expire", expireAfterSeconds=0)
+        print("КОНСТРУКТОР НАМУТИЛСЯ")
 
     def set_coupon5(self, user_id, step):
         """Выставляет купон 5 в БД на заданном шаге для конкретного user_id"""
@@ -219,6 +218,7 @@ class MongoCouponClass(MongoMainClass):
         if self.admin_table.find_one({"user_id" : user_id}) != None:
             return True
         return False
-        #self.search_userdata
-        #self.check_coupon5
-        #self.check_coupon10
+
+    def create_ttl_table(self):
+        """Ставит ttl по полю date_expire"""
+        self.coupon_table.create_index("date_expire", expireAfterSeconds=0)

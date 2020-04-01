@@ -142,6 +142,8 @@ class UserAlertClass:
         self.mongo_msg_obj = MongoMsgClass(connection_str)
         self.mongo_coupon_obj = MongoCouponClass(connection_str)
 
+
+        print(self.mongo_coupon_obj.coupon_table)
         self.mongo_coupon_obj.create_ttl_table()
         self.mongo_ttl_obj.create_ttl_table()
 
@@ -658,13 +660,26 @@ class MainClass:
         try:
             _, user_link = event.text.split(" ")
             #Получаем id пользователя, если это ссылка
-            if user_link
-            vk.com/dev/users.get
-            user_link
-            #Из ссылки получить id
-            if self.mongo_coupon_obj.search_userdata()
-        except:
-            #Неверный ввод данных
+            user_link = user_link.replace("https://vk.com/","")
+            r = self.vk.method("users.get", {"user_ids" : user_link})
+            print(r)
+            user_id = r["id"]
+
+            if self.mongo_obj.search_userdata(user_id):
+
+                opportunity_coupon5 = self.mongo_coupon_obj.check_coupon5(user_id)
+                opportunity_coupon10 = self.mongo_coupon_obj.check_coupon10(user_id)
+
+                message_str = "coupon5: {}, coupon10: {}".format(opportunity_coupon5, opportunity_coupon10)
+            
+            else:
+                message_str = "Введенного пользователя нет в системе!"
+
+        except ValueError:
+            message_str = "Некорректный ввод данных!"
+        
+        
+        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
     
     def admincommand_stats(self, event):
         """Команда админа для получения информации о пользователе"""
