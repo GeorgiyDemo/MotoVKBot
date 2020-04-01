@@ -154,3 +154,61 @@ class MongoMsgClass(MongoParentClass):
             result = result.replace("{account_username}", user_name)
 
         return result
+
+class MongoCouponClass(MongoMainClass):
+    """Класс для определения валидных купонов пользователя"""
+    def __init_(self, connection_str):
+        super().__init__(connection_str)
+        self.coupon_table = self.connection["coupons"]
+    
+    def create_ttl_table(self):
+        """Ставит ttl по полю date_expire"""
+        self.coupon_table.create_index("date_expire", expireAfterSeconds=0)
+
+    def set_coupon5(self, user_id, step):
+        """Выставляет купон 5 в БД на заданном шаге для конкретного user_id"""
+        
+        allowed_steps = {
+            16 : "step16_coupon5_time",
+            18 : "step18_coupon5_time"
+        }
+
+        if step in allowed_steps:
+
+            # Ищем кол-во секунд в настройках
+            field_seconds = self.settings_table.find_one({"name": allowed_steps[step]})["value"]
+            # Формируем дату
+            utc_timestamp = datetime.utcnow()
+            new_timestamp = utc_timestamp + timedelta(seconds=field_seconds)
+            #Запись
+            self.coupon_table.insert_one({"user_id": user_id, "coupon_type": "coupon_5", "date_expire": new_timestamp})
+
+    
+    def set_coupon10(self, user_id, step):
+        """Выставляет купон 10 в БД на заданном шаге для конкретного user_id"""
+        allowed_steps = {
+            19 : "step19_coupon10_time"
+        }
+        if step in allowed_steps:
+            field_seconds = self.settings_table.find_one({"name": allowed_steps[step]})["value"]
+            # Формируем дату
+            utc_timestamp = datetime.utcnow()
+            new_timestamp = utc_timestamp + timedelta(seconds=field_seconds)
+            self.coupon_table.insert_one({"user_id": user_id, "coupon_type": "coupon_10", "date_expire": new_timestamp})
+
+
+    def check_coupon5(self, user_id):
+        """Проверка на актуальность купона на 5% для заданного user_id пользователя"""
+        #Если пользователь дошел до N шага и при этом купон есть
+        self.get_current_step(user_id)
+        if self.get_current_step(user_id) > 14 and self.coupon_table.find_one({"user_id" : user_id,"coupon_type" : "coupon_5"}) != None:
+            return True
+        #Иначе купон уже истек
+        return False
+
+    def check_coupon10(self, user_id):
+        """Проверка на актуальность купона на 10% для заданного user_id пользователя"""
+        if self.get_current_step(user_id) > 18 and self.coupon_table.find_one({"user_id" : user_id,"coupon_type" : "coupon_10"}) != None:
+            return True
+        #Иначе купон уже истек
+        return False

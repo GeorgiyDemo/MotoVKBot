@@ -6,7 +6,7 @@ import time
 import requests
 import util_module
 import vk_api
-from mongo_module import MongoMainClass, MongoMsgClass, MongoTTLClass
+from mongo_module import MongoMainClass, MongoMsgClass, MongoTTLClass, MongoCouponClass
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
@@ -140,7 +140,9 @@ class UserAlertClass:
         self.mongo_ttl_obj = MongoTTLClass(connection_str)
         self.mongo_obj = MongoMainClass(connection_str)
         self.mongo_msg_obj = MongoMsgClass(connection_str)
+        self.mongo_coupon_obj = MongoCouponClass(connection_str)
 
+        self.mongo_coupon_obj.create_ttl_table()
         self.mongo_ttl_obj.create_ttl_table()
 
         while True:
@@ -288,7 +290,8 @@ class MainClass:
         self.mongo_msg_obj = MongoMsgClass(connection_str)
         # Выставление ожидания времени ttl в табличке
         self.mongo_ttl_obj = MongoTTLClass(connection_str)
-
+        #Купоны
+        self.mongo_coupon_obj = MongoCouponClass(connection_str)
         # Сообщение и какой метод за него отвечает
         self.main_dict = {
             "Начать": self.step_1,
@@ -569,6 +572,8 @@ class MainClass:
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str,
                                          'attachment': photo_obj.photo_str})
 
+        #Выставляем период действия купона
+        self.mongo_coupon_obj.set_coupon5(event.user_id, 15)
         # Выставляем TTL для step15to16
         self.mongo_ttl_obj.set_ttl_table("step15to16", event.user_id)
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 15}, {"coupon_5": "seen"})
@@ -590,10 +595,13 @@ class MainClass:
             return
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 18}, {"coupon_5": "false"})
         message_str = self.mongo_msg_obj.get_message(18, event.user_id)
+
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Получить купон', color=VkKeyboardColor.DEFAULT)
-        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str,
-                                         "keyboard": keyboard.get_keyboard()})
+        self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str, "keyboard": keyboard.get_keyboard()})
+
+        # Выставляем купон для user.id
+        self.mongo_coupon_obj.set_coupon5(event.user_id, 18)
 
     def step_19(self, event):
         """Обработка шага 19"""
@@ -603,7 +611,8 @@ class MainClass:
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/coupon_10.jpg")
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str,
                                          'attachment': photo_obj.photo_str})
-
+        # Выставляем купон для user.id
+        self.mongo_coupon_obj.set_coupon10(event.user_id, 19)
         # Выставляем TTL для step19to20
         self.mongo_ttl_obj.set_ttl_table("step19to20", event.user_id)
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 19}, {"coupon_10": "seen"})
