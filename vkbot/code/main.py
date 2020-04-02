@@ -143,7 +143,6 @@ class UserAlertClass:
         self.mongo_coupon_obj = MongoCouponClass(connection_str)
 
 
-        print(self.mongo_coupon_obj.coupon_table)
         self.mongo_coupon_obj.create_ttl_table()
         self.mongo_ttl_obj.create_ttl_table()
 
@@ -309,7 +308,7 @@ class MainClass:
             "Другая" : self.step_5,
             "Кастом": self.step_8,
             "Сток": self.step_7,
-            "Раздел расходники" : self.step_12,
+            "Раздел Расходники" : self.step_12,
             "Все товары" : self.step_13,
             "Раздел товаров кастом" : self.step_9,
             "Дешево и сердито": self.step_11,
@@ -368,6 +367,7 @@ class MainClass:
 
                     #Значит это может быть какая-то админская команда
                     elif self.mongo_coupon_obj.check_admin(event.user_id):
+                        print("ПРОВЕРКА НА АДМИНА ПРОШЛА")
                         for command in self.admincommands_dict:
                             if command in event.text:
                                 self.admincommands_dict[command](event)
@@ -386,8 +386,9 @@ class MainClass:
 
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
-        keyboard.add_button('Чек-лист "Трушного боббера"', color=VkKeyboardColor.DEFAULT)
         keyboard.add_button('Магазин', color=VkKeyboardColor.DEFAULT)
+        keyboard.add_line()
+        keyboard.add_button('Чек-лист "Трушного боббера"', color=VkKeyboardColor.DEFAULT)
 
         # Загружаем фото
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/buttons.jpg")
@@ -661,9 +662,7 @@ class MainClass:
             _, user_link = event.text.split(" ")
             #Получаем id пользователя, если это ссылка
             user_link = user_link.replace("https://vk.com/","")
-            r = self.vk.method("users.get", {"user_ids" : user_link})
-            print(r)
-            user_id = r["id"]
+            user_id = self.vk.method("users.get", {"user_ids" : user_link})[0]["id"]
 
             if self.mongo_obj.search_userdata(user_id):
 
@@ -673,11 +672,13 @@ class MainClass:
                 message_str = "coupon5: {}, coupon10: {}".format(opportunity_coupon5, opportunity_coupon10)
             
             else:
-                message_str = "Введенного пользователя нет в системе!"
+                message_str = "❌ Введенного пользователя нет в системе!"
 
         except ValueError:
-            message_str = "Некорректный ввод данных!"
-        
+            message_str = "❌ Некорректный ввод данных!"
+        except Exception as e:
+            message_str = "❌ Неожиданная ошибка {}".format(e.name)
+
         
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
     

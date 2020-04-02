@@ -155,21 +155,18 @@ class MongoMsgClass(MongoParentClass):
 
         return result
 
-#TODO МАКСИМАЛЬНО СТРАННАЯ ОШИБКА, как-будто конструктор не выполняется
 class MongoCouponClass(MongoMainClass):
     """Класс для определения валидных купонов пользователя"""
-    def __init_(self, connection_str):
+    def __init__(self, connection_str):
         super().__init__(connection_str)
-        print("ВЫПОЛНИЛСЯ")
         self.coupon_table = self.connection["coupons"]
         self.admin_table = self.connection["admins"]
-        print("КОНСТРУКТОР НАМУТИЛСЯ")
 
     def set_coupon5(self, user_id, step):
         """Выставляет купон 5 в БД на заданном шаге для конкретного user_id"""
         
         allowed_steps = {
-            16 : "step16_coupon5_time",
+            15 : "step15_coupon5_time",
             18 : "step18_coupon5_time"
         }
 
@@ -183,6 +180,8 @@ class MongoCouponClass(MongoMainClass):
             #Запись
             self.coupon_table.insert_one({"user_id": user_id, "coupon_type": "coupon_5", "date_expire": new_timestamp})
 
+        else:
+            raise ValueError("Несуществующий шаг для купона 5","Некорректный вызов с шагом {}".format(step))
     
     def set_coupon10(self, user_id, step):
         """Выставляет купон 10 в БД на заданном шаге для конкретного user_id"""
@@ -195,8 +194,9 @@ class MongoCouponClass(MongoMainClass):
             utc_timestamp = datetime.utcnow()
             new_timestamp = utc_timestamp + timedelta(seconds=field_seconds)
             self.coupon_table.insert_one({"user_id": user_id, "coupon_type": "coupon_10", "date_expire": new_timestamp})
-
-
+        else:
+            raise ValueError("Несуществующий шаг для купона 10","Некорректный вызов с шагом {}".format(step))
+    
     def check_coupon5(self, user_id):
         """Проверка на актуальность купона на 5% для заданного user_id пользователя"""
         #Если пользователь дошел до N шага и при этом купон есть
@@ -215,8 +215,10 @@ class MongoCouponClass(MongoMainClass):
 
     def check_admin(self, user_id):
         """Проверка пользователя на админа"""
-        if self.admin_table.find_one({"user_id" : user_id}) != None:
+        if self.admin_table.find_one({"vk_id" : user_id}) != None:
+            print(user_id,"админ")
             return True
+        print(user_id,"не админ")
         return False
 
     def create_ttl_table(self):
