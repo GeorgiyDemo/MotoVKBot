@@ -587,10 +587,15 @@ class MainClass:
         """Обработка шага 17"""
         if self.step_controller(event.user_id, 16, 20):
             return
+        
         if self.mongo_obj.get_current_step(event.user_id) == 20:
             self.mongo_obj.update_userdata(event.user_id, {"current_step": 17}, {"coupon_10": "true"})
+            self.mongo_coupon_obj.remove_coupon10(event.user_id)
+        
         else:
             self.mongo_obj.update_userdata(event.user_id, {"current_step": 17}, {"coupon_5": "true"})
+            self.mongo_coupon_obj.remove_coupon5(event.user_id)
+        
         message_str = self.mongo_msg_obj.get_message(17, event.user_id)
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})
 
@@ -654,18 +659,25 @@ class MainClass:
     def admincommand_userinfo(self, event):
         """Команда админа для получения информации о пользователе"""
 
+        bool_dict = {
+            True : "✅",
+            False : "❌", 
+        }
         try:
             _, user_link = event.text.split(" ")
             #Получаем id пользователя, если это ссылка
             user_link = user_link.replace("https://vk.com/","")
+            #Не перепутать: это id пользователя, которого ищем, не event.user_id
             user_id = self.vk.method("users.get", {"user_ids" : user_link})[0]["id"]
 
             if self.mongo_obj.search_userdata(user_id):
 
-                opportunity_coupon5 = self.mongo_coupon_obj.check_coupon5(user_id)
-                opportunity_coupon10 = self.mongo_coupon_obj.check_coupon10(user_id)
+                coupon5_bool = self.mongo_coupon_obj.check_coupon5(user_id)
+                coupon10_bool = self.mongo_coupon_obj.check_coupon10(user_id)
 
-                message_str = "coupon5: {}, coupon10: {}".format(opportunity_coupon5, opportunity_coupon10)
+                coupon5_str, coupon10_str = bool_dict[coupon5_bool], bool_dict[coupon10_bool]
+                r = self.mongo_obj.get_userdata(user_id)
+                message_str = "Действие купона 5%: {}\nДействие купона 10%: {}\n\nТекущий шаг: {}\nКол-во отправленных постов: {}\n\nМодель: {}\nТип: {}\nЦеновой сегмент: {}\nПриоритет: {}\nЖелание: {}".format(coupon5_str, coupon10_str, r["current_step"], r["posts_send"], r["moto_model"], r["moto_type"], r["price_type"], r["priority_type"], r["wish"])
             
             else:
                 message_str = "❌ Введенного пользователя нет в системе!"
@@ -673,7 +685,7 @@ class MainClass:
         except ValueError:
             message_str = "❌ Некорректный ввод данных!"
         except Exception as e:
-            message_str = "❌ Неожиданная ошибка {}".format(e.name)
+            message_str = "❌ Неожиданная ошибка {}".format(e)
 
         
         self.vk.method('messages.send', {'user_id': event.user_id, 'random_id': get_random_id(), 'message': message_str})

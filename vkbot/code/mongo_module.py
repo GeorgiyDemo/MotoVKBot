@@ -73,6 +73,10 @@ class MongoMainClass(MongoParentClass):
             return False
         return True
 
+    def get_userdata(self, user_id):
+        """Получение всех данных о пользователе по его user_id"""
+        return self.users_table.find_one({"user_id" : user_id},{"_id" : 0})
+    
     def update_userdata(self, user_id, *items):
         """Обновление произвольных данных пользователей в БД"""
         set_dict = {}
@@ -106,7 +110,7 @@ class MongoTTLClass(MongoParentClass):
     def __init__(self, connection_str):
         super().__init__(connection_str)
         self.ttl_table = self.connection["ttl"]
-        self.user_table = self.connection["users"]
+        self.users_table = self.connection["users"]
         self.settings_table = self.connection["settings"]
 
     def create_ttl_table(self):
@@ -124,7 +128,7 @@ class MongoTTLClass(MongoParentClass):
         """Установка временных полей"""
 
         # Ищем id пользователя
-        user_system_id = self.user_table.find_one({"user_id": user_id}, {"_id": 1})["_id"]
+        user_system_id = self.users_table.find_one({"user_id": user_id}, {"_id": 1})["_id"]
 
         # Ищем кол-во секунд в настройках
         field_seconds = self.settings_table.find_one({"name": field + "_time"})["value"]
@@ -143,14 +147,14 @@ class MongoMsgClass(MongoParentClass):
     def __init__(self, connection_str):
         super().__init__(connection_str)
         self.msg_table = self.connection["out_messages"]
-        self.user_table = self.connection["users"]
+        self.users_table = self.connection["users"]
 
     def get_message(self, step, user_id):
         result = self.msg_table.find_one({"current_step": step}, {"message": 1, "_id": 0})["message"]
 
         # Если есть {account_username}, то его надо заменить на имя пользователя с БД
         if "{account_username}" in result:
-            user_name = self.user_table.find_one({"user_id": user_id})["first_name"]
+            user_name = self.users_table.find_one({"user_id": user_id})["first_name"]
             result = result.replace("{account_username}", user_name)
 
         return result
@@ -222,3 +226,18 @@ class MongoCouponClass(MongoMainClass):
     def create_ttl_table(self):
         """Ставит ttl по полю date_expire"""
         self.coupon_table.create_index("date_expire", expireAfterSeconds=0)
+    
+    def remove_coupon5(self, user_id):
+        """
+        Приостанавливает действие купона 5 для пользователя.
+        Необходимо, если пользователь подтвердил использование купона, а он еще не удалился
+        """
+        r = self.coupon_table.delete_many({"user_id": user_id, "coupon_type": "coupon_5"})
+        print(r)
+    def remove_coupon10(self, user_id):
+        """
+        Приостанавливает действие купона 10 для пользователя.
+        Необходимо, если пользователь подтвердил использование купона, а он еще не удалился
+        """
+        r = self.coupon_table.delete_many({"user_id": user_id, "coupon_type": "coupon_10"})
+        print(r)
