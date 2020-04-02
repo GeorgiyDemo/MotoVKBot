@@ -232,12 +232,11 @@ class MongoCouponClass(MongoMainClass):
         Приостанавливает действие купона 5 для пользователя.
         Необходимо, если пользователь подтвердил использование купона, а он еще не удалился
         """
-        r = self.coupon_table.delete_many({"user_id": user_id, "coupon_type": "coupon_5"})
-        print(r)
+        self.coupon_table.delete_many({"user_id": user_id, "coupon_type": "coupon_5"})
+
     def remove_coupon10(self, user_id):
         """
         Приостанавливает действие купона 10 для пользователя.
         Необходимо, если пользователь подтвердил использование купона, а он еще не удалился
         """
-        r = self.coupon_table.delete_many({"user_id": user_id, "coupon_type": "coupon_10"})
-        print(r)
+        self.coupon_table.delete_many({"user_id": user_id, "coupon_type": "coupon_10"})
