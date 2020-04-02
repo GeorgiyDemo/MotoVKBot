@@ -84,7 +84,6 @@ class WallMonitoringClass:
         attachments_list = []
         if "attachments" in locale_d:
             for attachment in locale_d["attachments"]:
-                print(attachment)
                 a_type = attachment["type"]
                 if a_type in allowed_types:
                     attachment_str = "{}{}_{}".format(a_type, attachment[a_type]["owner_id"], attachment[a_type]["id"])
@@ -94,7 +93,6 @@ class WallMonitoringClass:
                     url_str = attachment["link"]["url"]
 
             attachments_str = ",".join(attachments_list)
-            print(attachments_str)
         else:
             attachments_str = ""
             
@@ -367,7 +365,6 @@ class MainClass:
 
                     #Значит это может быть какая-то админская команда
                     elif self.mongo_coupon_obj.check_admin(event.user_id):
-                        print("ПРОВЕРКА НА АДМИНА ПРОШЛА")
                         for command in self.admincommands_dict:
                             if command in event.text:
                                 self.admincommands_dict[command](event)
@@ -654,7 +651,6 @@ class MainClass:
         self.mongo_ttl_obj.set_ttl_table("step22to23plus", event.user_id)
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 22}, {"wish": wish})
 
-    #TODO Сделать команду для получения информации
     def admincommand_userinfo(self, event):
         """Команда админа для получения информации о пользователе"""
 

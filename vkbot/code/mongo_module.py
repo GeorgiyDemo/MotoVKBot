@@ -216,9 +216,7 @@ class MongoCouponClass(MongoMainClass):
     def check_admin(self, user_id):
         """Проверка пользователя на админа"""
         if self.admin_table.find_one({"vk_id" : user_id}) != None:
-            print(user_id,"админ")
             return True
-        print(user_id,"не админ")
         return False
 
     def create_ttl_table(self):
