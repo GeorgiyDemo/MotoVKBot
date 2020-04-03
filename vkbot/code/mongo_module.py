@@ -49,12 +49,25 @@ class MongoMainClass(MongoParentClass):
         """Добавление данных о постах на стене группы"""
         self.wall_table.insert_one({"wall_id": wall_id, "tag": tag})
 
-    def new_userdata(self, user_id, first_name, second_name, current_step):
+    def new_userdata(self, user_id, first_name, second_name):
         """Занесение начальных значений пользователя в БД"""
-        self.users_table.insert_one({"user_id": user_id, "first_name": first_name, "second_name": second_name,
-                                     "current_step": current_step, "moto_model": "-", "moto_type": "-",
-                                     "price_type": "-", "priority_type": "-", "coupon_5": "-", "coupon_10": "-",
-                                     "wish": "-", "posts_send": 0})
+        new_data_dict = {}
+        new_data_dict["user_id"] = user_id,
+        new_data_dict["bot_stopped"] = False
+        new_data_dict["bot_banned"] = False
+        new_data_dict["first_name"] = first_name
+        new_data_dict["second_name"] = second_name
+        new_data_dict["current_step"] = 1
+        new_data_dict["moto_model"] = "-"
+        new_data_dict["moto_type"] = "-"
+        new_data_dict["price_type"] = "-"
+        new_data_dict["priority_type"] = "-"
+        new_data_dict["coupon_5"] = "-"
+        new_data_dict["coupon_10"] = "-"
+        new_data_dict["wish"] = "-"
+        new_data_dict["posts_send"] = 0
+        
+        self.users_table.insert_one(new_data_dict)
 
     def inc_user_postssend(self, user_id):
         """Осуществляет инкремент кол-ва новостей (posts_send) для указанного пользователя"""
@@ -105,6 +118,9 @@ class MongoMainClass(MongoParentClass):
         """Получение слова для его последующей замены на имя пользователя"""
         return self.settings_table.find_one({"name": "replace_word"})["value"]
 
+    def get_userbot_ship(self, user_id):
+        """Возвращает поля bot_stopped и bot_banned для указанного user_id"""
+        return self.users_table.find_one({"user_id" : user_id},{"_id ": 0 , "bot_stopped": 1, "bot_banned" : 1})
 
 class MongoTTLClass(MongoParentClass):
     def __init__(self, connection_str):
@@ -155,7 +171,7 @@ class MongoMsgClass(MongoParentClass):
         # Если есть {account_username}, то его надо заменить на имя пользователя с БД
         if "{account_username}" in result:
             user_name = self.users_table.find_one({"user_id": user_id})["first_name"]
-            result = result.replace("{account_username}", user_name)
+            result = result.replace("{account_username}", user_name, 1)
 
         return result
 
