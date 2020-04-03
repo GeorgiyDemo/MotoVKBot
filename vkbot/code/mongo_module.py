@@ -52,7 +52,7 @@ class MongoMainClass(MongoParentClass):
     def new_userdata(self, user_id, first_name, second_name):
         """Занесение начальных значений пользователя в БД"""
         new_data_dict = {}
-        new_data_dict["user_id"] = user_id,
+        new_data_dict["user_id"] = user_id
         new_data_dict["bot_stopped"] = False
         new_data_dict["bot_banned"] = False
         new_data_dict["first_name"] = first_name
@@ -120,7 +120,36 @@ class MongoMainClass(MongoParentClass):
 
     def get_userbot_ship(self, user_id):
         """Возвращает поля bot_stopped и bot_banned для указанного user_id"""
-        return self.users_table.find_one({"user_id" : user_id},{"_id ": 0 , "bot_stopped": 1, "bot_banned" : 1})
+        r = self.users_table.find_one({"user_id" : user_id})
+
+        return r["bot_stopped"], r["bot_banned"]
+
+    def get_stats(self):
+        """Получение dict со статистикой пользователей"""
+        return_dict = {}
+        
+        #Всего пользователей
+        return_dict["users_count"] = len(list(self.users_table.find()))
+        #Получение кол-ва пользователей, которые остановили рассылку бота
+        return_dict["bot_stopped"] = len(list(self.users_table.find({"bot_stopped": True})))
+        #Получение кол-ва пользователей, которые заблокировали бота
+        return_dict["bot_banned"] = len(list(self.users_table.find({"bot_banned": True})))
+        
+        #Количество человек на каждом шаге
+        return_dict["steps"] = {}
+        #TODO Получить все шаги и по ним производить формирование
+        for step in range(1,27):
+            return_dict["steps"][step] = len(list(self.users_table.find({"current_step" : step})))
+            
+        #Количество человек по каждому тегу
+        return_dict["tags"] = {}
+        tags_list = self.get_alltags()
+        for tag in tags_list:
+            #Получаем поля тега 
+            tags_fields = self.tags_table.find_one({"name" : tag}, {"_id": 0, "name": 0})
+            return_dict["tags"][tag] = len(list(self.users_table.find(tags_fields)))
+
+        return return_dict
 
 class MongoTTLClass(MongoParentClass):
     def __init__(self, connection_str):

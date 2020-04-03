@@ -12,9 +12,3 @@ def get_settings():
     """Чтение настроек с yaml"""
     with open("./yaml/settings.yml", 'r') as stream:
         return yaml.safe_load(stream)
-
-
-class UserBannedException(Exception):
-    #Выставляем в БД что бот заблокирован для пользователя
-    pass
-    

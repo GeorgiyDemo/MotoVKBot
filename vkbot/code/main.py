@@ -1,29 +1,27 @@
 # https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
-# TODO Удаление пользователя по команде СТОП
-# TODO Проверка если пользователь заблокировал бота
-# TODO Статистика
+# TODO Если пользователь разблокировал бота - надо ли пытаться отправить сообщение?
 
-#Вводим поля banned_bot и stopped_bot
 import multiprocessing as mp
 import time
 import requests
-from util_module import wallpost_check, get_settings, UserBannedException
 import vk_api
 from mongo_module import MongoMainClass, MongoMsgClass, MongoTTLClass, MongoCouponClass
+from util_module import wallpost_check, get_settings
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
 
-
-def secure_sendmessage(vk, user_id, message_str=None, attachments_str=None, keyboard=None):
+def secure_sendmessage(vk, mongo_obj, user_id, message_str=None, attachments_str=None, keyboard=None):
     """
     Метод для безопасной отправки сообщения пользователю
     - Возврат True, если сообщение отправлено
     - Возврат False, если сообщение не отправлено
     """
-    #Проверить, не остановил ли пользователь бота или не забанил его?
+    #Если пользователь заблокировал бота
+    if mongo_obj.get_userbot_ship(user_id)[1]:
+        return False
 
-    if get_userbot_ship
+    #Пытаемся отправить сообщение
     try:
         sendargs_dict = {}
         sendargs_dict["user_id"] = user_id
@@ -32,16 +30,15 @@ def secure_sendmessage(vk, user_id, message_str=None, attachments_str=None, keyb
         sendargs_dict["keyboard"] = keyboard,
         sendargs_dict["attachment"] = attachments_str
         sendargs_dict = {k:v for (k,v) in sendargs_dict.items() if v != None}
-
         vk.method('messages.send', sendargs_dict)
-
         return True
 
     except vk_api.exceptions.ApiError as vk_error:
-        print("КОД НИЖЕ:")
-        print(vk_error.code)
-        print("Ошибка! " + str(vk_error))
-
+        #Выставляем в БД что бот заблокирован для пользователя
+        if vk_error.code == 901:
+            mongo_obj.update_userdata(user_id, {"bot_banned": True})
+        else:
+            print("Странная ошибка:", vk_error)
         return False
 
 class WallMonitoringClass:
@@ -96,10 +93,8 @@ class WallMonitoringClass:
             #Отправляем сообщение каждому пользователю
             for user_id, msg in users_msg_dict.items():
                 
-                #TODO if get_userbot_ship()
-                #Если нет команды стоп
-                if secure_sendmessage(self.club_vk,user_id, msg, attachments_str): 
-                    # +1 пост для пользователя
+                #Если нет команды стоп и сообщение отправилось, то +1 пост для пользователя
+                if not self.mongo_obj.get_userbot_ship(user_id)[0] and secure_sendmessage(self.club_vk, self.mongo_obj, user_id, msg, attachments_str): 
                     self.mongo_obj.inc_user_postssend(user_id)
                 time.sleep(0.2)
 
@@ -236,7 +231,7 @@ class UserAlertClass:
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Получить купон', color=VkKeyboardColor.DEFAULT)
         message_str = self.mongo_msg_obj.get_message(14, user_id)
-        secure_sendmessage(self.group_vk, user_id, message_str, keyboard=keyboard.get_keyboard())
+        secure_sendmessage(self.group_vk, self.mongo_obj, user_id, message_str, keyboard=keyboard.get_keyboard())
         
     def step16(self, user_id):
         """Обработка шага 16"""
@@ -245,7 +240,7 @@ class UserAlertClass:
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Да', color=VkKeyboardColor.DEFAULT)
         keyboard.add_button('Нет', color=VkKeyboardColor.DEFAULT)
-        secure_sendmessage(self.group_vk, user_id, message_str, keyboard=keyboard.get_keyboard())
+        secure_sendmessage(self.group_vk, self.mongo_obj, user_id, message_str, keyboard=keyboard.get_keyboard())
             
 
 
@@ -256,26 +251,26 @@ class UserAlertClass:
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Да', color=VkKeyboardColor.DEFAULT)
         keyboard.add_button('Нет', color=VkKeyboardColor.DEFAULT)
-        secure_sendmessage(self.group_vk, user_id, message_str, keyboard=keyboard.get_keyboard())
+        secure_sendmessage(self.group_vk, self.mongo_obj, user_id, message_str, keyboard=keyboard.get_keyboard())
             
 
     def step_23(self, user_id):
         """Обработка шага 23"""
         self.mongo_obj.update_userdata(user_id, {"current_step": 23})
         message_str = self.mongo_msg_obj.get_message(23, user_id)
-        secure_sendmessage(self.group_vk, user_id, message_str)
+        secure_sendmessage(self.group_vk, self.mongo_obj, user_id, message_str)
 
     def step_24(self, user_id):
         """Обработка шага 24"""
         self.mongo_obj.update_userdata(user_id, {"current_step": 24})
         message_str = self.mongo_msg_obj.get_message(24, user_id)
-        secure_sendmessage(self.group_vk, user_id, message_str)
+        secure_sendmessage(self.group_vk, self.mongo_obj, user_id, message_str)
         
     def step_25(self, user_id):
         """Обработка шага 25"""
         self.mongo_obj.update_userdata(user_id, {"current_step": 25})
         message_str = self.mongo_msg_obj.get_message(25, user_id)
-        secure_sendmessage(self.group_vk, user_id, message_str)
+        secure_sendmessage(self.group_vk, self.mongo_obj, user_id, message_str)
 
     def step_26(self, user_id):
         """Заглушка для варианта 'Мне это не интересно'"""
@@ -352,6 +347,9 @@ class MainClass:
             "Понизить цены" : self.step_22,
             "Повысить качество" : self.step_22,
             "Мне это не интересно" : self.step_22,
+            "Стоп" : self.usercommand_stop,
+            "стоп" : self.usercommand_stop,
+            "СТОП" : self.usercommand_stop,
         }
 
         self.admincommands_dict = {
@@ -422,7 +420,7 @@ class MainClass:
         # Загружаем фото
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/buttons.jpg")
         message_str = self.mongo_msg_obj.get_message(1, event.user_id)
-        secure_sendmessage(self.vk, event.user_id, message_str, photo_obj.photo_str,  keyboard.get_keyboard())
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str, photo_obj.photo_str,  keyboard.get_keyboard())
 
     def step_2(self, event):
         """Обработка шага 2"""
@@ -430,7 +428,7 @@ class MainClass:
             return
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 2})
         message_str = self.mongo_msg_obj.get_message(2, event.user_id)
-        if secure_sendmessage(self.vk, event.user_id, message_str):
+        if secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str):
             # Т.к. у нас безусловный переход от 2 к 4 шагу
             time.sleep(1)
             self.step_4(event)
@@ -441,7 +439,7 @@ class MainClass:
             return
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 3})
         message_str = self.mongo_msg_obj.get_message(3, event.user_id)
-        if secure_sendmessage(self.vk, event.user_id, message_str):
+        if secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str):
             # Т.к. у нас безусловный переход от 3 к 4 шагу
             time.sleep(1)
             self.step_4(event)
@@ -465,7 +463,7 @@ class MainClass:
 
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 4})
         message_str = self.mongo_msg_obj.get_message(4, event.user_id)
-        secure_sendmessage(self.vk, event.user_id, message_str, keyboard=keyboard.get_keyboard())
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str, keyboard=keyboard.get_keyboard())
 
     def step_5(self, event):
         """
@@ -477,7 +475,7 @@ class MainClass:
         
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 5})
         message_str = self.mongo_msg_obj.get_message(5, event.user_id)
-        secure_sendmessage(self.vk, event.user_id, message_str)
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str)
 
     def step_6(self, event):
         """
@@ -494,7 +492,7 @@ class MainClass:
         keyboard.add_button('Сток', color=VkKeyboardColor.DEFAULT)
         keyboard.add_button('Кастом', color=VkKeyboardColor.DEFAULT)
         message_str = self.mongo_msg_obj.get_message(6, event.user_id)
-        secure_sendmessage(self.vk, event.user_id, message_str, keyboard=keyboard.get_keyboard())
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str, keyboard=keyboard.get_keyboard())
 
     def step_7(self, event):
         """Обработка шага 7"""
@@ -507,7 +505,7 @@ class MainClass:
         self.mongo_obj.update_userdata(event.user_id, {"moto_type": "сток"}, {"current_step": 7})
         message_str = self.mongo_msg_obj.get_message(7, event.user_id)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/expendable.jpg")
-        secure_sendmessage(self.vk, event.user_id, message_str, photo_obj.photo_str, keyboard.get_keyboard())
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str, photo_obj.photo_str, keyboard.get_keyboard())
 
     def step_8(self, event):
         """Обработка шага 8"""
@@ -519,7 +517,7 @@ class MainClass:
         keyboard.add_button('Раздел товаров кастом', color=VkKeyboardColor.DEFAULT)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/custom.jpg")
 
-        if secure_sendmessage(self.vk, event.user_id, message_str, photo_obj.photo_str, keyboard.get_keyboard()):
+        if secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str, photo_obj.photo_str, keyboard.get_keyboard()):
             time.sleep(1)
             self.step_8(event)
 
@@ -529,7 +527,7 @@ class MainClass:
             return
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 9})
         message_str = self.mongo_msg_obj.get_message(9, event.user_id)
-        if secure_sendmessage(self.vk, event.user_id, message_str):
+        if secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str):
             time.sleep(1)
             self.step_10(event)
 
@@ -549,7 +547,7 @@ class MainClass:
         keyboard.add_button('Дорого-богато', color=VkKeyboardColor.DEFAULT)
         message_str = self.mongo_msg_obj.get_message(10, event.user_id)
 
-        secure_sendmessage(self.vk, event.user_id, message_str, keyboard=keyboard.get_keyboard())
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str, keyboard=keyboard.get_keyboard())
 
     def step_11(self, event):
         """Обработка шага 11"""
@@ -564,7 +562,7 @@ class MainClass:
         keyboard.add_button('Качество', color=VkKeyboardColor.DEFAULT)
 
         message_str = self.mongo_msg_obj.get_message(11, event.user_id)
-        secure_sendmessage(self.vk, event.user_id, message_str, keyboard=keyboard.get_keyboard())
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str, keyboard=keyboard.get_keyboard())
 
     def step_12(self, event):
         """Обработка шага 12"""
@@ -572,7 +570,7 @@ class MainClass:
             return
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 12})
         message_str = self.mongo_msg_obj.get_message(12, event.user_id)
-        secure_sendmessage(self.vk, event.user_id, message_str)
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str)
 
     def step_13(self, event):
         """Обработка шага 13"""
@@ -580,7 +578,7 @@ class MainClass:
             return
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 13})
         message_str = self.mongo_msg_obj.get_message(13, event.user_id)
-        secure_sendmessage(self.vk, event.user_id, message_str)
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str)
 
     def step_14(self, event):
         """Обработка шага 14"""
@@ -592,7 +590,7 @@ class MainClass:
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Получить купон', color=VkKeyboardColor.DEFAULT)
         message_str = self.mongo_msg_obj.get_message(14, event.user_id)
-        secure_sendmessage(self.vk, event.user_id, message_str, keyboard=keyboard.get_keyboard())
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str, keyboard=keyboard.get_keyboard())
 
     def step_15(self, event):
         """Обработка шага 15"""
@@ -601,7 +599,7 @@ class MainClass:
         message_str = self.mongo_msg_obj.get_message(15, event.user_id)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/coupon_5.jpg")
         
-        if secure_sendmessage(self.vk, event.user_id, message_str, photo_obj.photo_str):
+        if secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str, photo_obj.photo_str):
 
             #Выставляем период действия купона
             self.mongo_coupon_obj.set_coupon5(event.user_id, 15)
@@ -623,7 +621,7 @@ class MainClass:
             self.mongo_coupon_obj.remove_coupon5(event.user_id)
         
         message_str = self.mongo_msg_obj.get_message(17, event.user_id)
-        secure_sendmessage(self.vk, event.user_id, message_str)
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str)
 
     def step_18(self, event):
         """Обработка шага 18"""
@@ -634,7 +632,7 @@ class MainClass:
 
         keyboard = VkKeyboard(one_time=True)
         keyboard.add_button('Получить купон', color=VkKeyboardColor.DEFAULT)
-        if secure_sendmessage(self.vk, event.user_id, message_str, keyboard=keyboard.get_keyboard()):
+        if secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str, keyboard=keyboard.get_keyboard()):
             # Выставляем купон для user.id
             self.mongo_coupon_obj.set_coupon5(event.user_id, 18)
 
@@ -645,7 +643,7 @@ class MainClass:
         message_str = self.mongo_msg_obj.get_message(19, event.user_id)
         photo_obj = PhotoUploaderClass(self.vk, event.user_id, "./img/coupon_10.jpg")
 
-        if secure_sendmessage(self.vk, event.user_id, message_str, photo_obj.photo_str):
+        if secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str, photo_obj.photo_str):
 
             # Выставляем купон для user.id
             self.mongo_coupon_obj.set_coupon10(event.user_id, 19)
@@ -668,7 +666,7 @@ class MainClass:
         keyboard.add_line()
         keyboard.add_button('Мне это не интересно', color=VkKeyboardColor.DEFAULT)
 
-        secure_sendmessage(self.vk, event.user_id, message_str, keyboard=keyboard.get_keyboard())
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str, keyboard=keyboard.get_keyboard())
 
     def step_22(self, event):
         """Обработка шага 22"""
@@ -677,7 +675,7 @@ class MainClass:
         wish = event.text
         message_str = self.mongo_msg_obj.get_message(22, event.user_id)
 
-        if secure_sendmessage(self.vk, event.user_id, message_str):
+        if secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str):
                 
             # Выставляем TTL для step19to20
             self.mongo_ttl_obj.set_ttl_table("step22to23plus", event.user_id)
@@ -714,12 +712,30 @@ class MainClass:
         except Exception as e:
             message_str = "❌ Неожиданная ошибка {}".format(e)
 
-        secure_sendmessage(self.vk, event.user_id, message_str)
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str)
 
+    def usercommand_stop(self, event):
+        """Остановки рассылки для конкретного пользователя"""
+        
+        self.mongo_obj.update_userdata(event.user_id, {"bot_stopped": True})
+        message_str = "Хорошо, отписал Вас от рассылки 😌"
+        secure_sendmessage(self.vk, self.mongo_obj, event.user_id, message_str)
+        
     def admincommand_stats(self, event):
         """Команда админа для получения информации о пользователе"""
-        message_str = "\n- Cколько чел всего воспользователось:\nСколько чел заблочило бота\nСколько чел сказало СТОП боту\nСколько чел на каждом этапе\nСколько чел на каждом теге"
-        secure_sendmessage(self.vk, event.user_id, message_str)
+        d = self.mongo_obj.get_stats()
+        message_str = "\nВсего пользователей: {}\nЗаблокировали бота: {}\nОстановили рассылку: {}\n\nТеги:".format(d["users_count"], d["bot_banned"], d["bot_stopped"])
+        
+        #Добавляем этапы
+        for tag, value in d["tags"].items():
+            message_str += "\n{}: {}".format(tag, value)
+        
+        #Добавляем теги
+        message_str += "\n\nЭтапы:"
+        for step, value in d["steps"].items():
+            message_str += "\n{}: {}".format(step, value)
+
+        secure_sendmessage(self.vk, self.mongo_obj,  event.user_id, message_str)
 
     def get_username(self, user_id):
         """Метод, возвращающий имя пользователя по id"""
