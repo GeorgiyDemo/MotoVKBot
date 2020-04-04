@@ -137,7 +137,7 @@ class MongoMainClass(MongoParentClass):
         
         #Количество человек на каждом шаге
         return_dict["steps"] = {}
-        #TODO Получить все шаги и по ним производить формирование
+
         for step in range(1,27):
             return_dict["steps"][step] = len(list(self.users_table.find({"current_step" : step})))
             

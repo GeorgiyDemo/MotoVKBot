@@ -486,6 +486,9 @@ class MainClass:
             return
         # Занесение информации о модели
         moto_model = event.text
+        #Если текст слишком большой, то его сокращаем
+        if len(moto_model) > 50:
+            moto_model = moto_model[:50]
         self.mongo_obj.update_userdata(event.user_id, {"current_step": 6}, {"moto_model": moto_model})
         # Кнопки для VK
         keyboard = VkKeyboard(one_time=True)
