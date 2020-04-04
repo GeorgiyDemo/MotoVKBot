@@ -1,5 +1,4 @@
 # https://oauth.vk.com/authorize?client_id=5155010&redirect_uri=https://oauth.vk.com/blank.html&display=page&scope=offline,groups&response_type=token&v=5.37
-# TODO Если пользователь разблокировал бота - надо ли пытаться отправить сообщение?
 
 import multiprocessing as mp
 import time
@@ -18,8 +17,8 @@ def secure_sendmessage(vk, mongo_obj, user_id, message_str=None, attachments_str
     - Возврат False, если сообщение не отправлено
     """
     #Если пользователь заблокировал бота
-    if mongo_obj.get_userbot_ship(user_id)[1]:
-        return False
+    #if mongo_obj.get_userbot_ship(user_id)[1]:
+    #    return False
 
     #Пытаемся отправить сообщение
     try:
@@ -31,6 +30,7 @@ def secure_sendmessage(vk, mongo_obj, user_id, message_str=None, attachments_str
         sendargs_dict["attachment"] = attachments_str
         sendargs_dict = {k:v for (k,v) in sendargs_dict.items() if v != None}
         vk.method('messages.send', sendargs_dict)
+        mongo_obj.update_userdata(user_id, {"bot_banned": False})
         return True
 
     except vk_api.exceptions.ApiError as vk_error:
@@ -406,6 +406,7 @@ class MainClass:
         # Получаем имя пользователя
         first_name, second_name = self.get_username(event.user_id)
         if self.mongo_obj.search_userdata(event.user_id):
+            # return намутить
             # Удаление пользователя
             self.mongo_obj.remove_userdata(event.user_id)
 
